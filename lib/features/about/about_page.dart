@@ -16,7 +16,7 @@ class AboutPage extends StatelessWidget {
           SectionHeader(
             title: 'Sobre',
             subtitle:
-                'Versao visual atual do logger para ESP32 com MQTT e CSV.',
+                'Versao visual atual do logger para ESP32 com Bluetooth (BLE) e CSV.',
           ),
           const SizedBox(height: 12),
           Card(
@@ -36,15 +36,11 @@ class AboutPage extends StatelessWidget {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          'Compatibilidade prevista: Windows Desktop, Android e Web.',
+                          'Compatibilidade prevista: Windows Desktop e Android, via Bluetooth Low Energy.',
                         ),
                         const SizedBox(height: 8),
                         const Text(
                           'Baseado em Riverpod, com separacao entre modelos, servicos e telas.',
-                        ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          'A interface utiliza um logo vetorial quando a imagem BMP nao existe no workspace.',
                         ),
                       ],
                     ),

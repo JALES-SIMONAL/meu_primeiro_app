@@ -35,10 +35,11 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
   flutter_riverpod: ^3.3.2
-  mqtt_client: ^10.11.11
   intl: ^0.20.3
   csv: ^8.0.0
   uuid: ^4.6.0
+  flutter_blue_plus: ^2.3.11
+  permission_handler: ^12.0.3
 
 dev_dependencies:
   flutter_test:
@@ -50,9 +51,27 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
+
+# Gera os ícones nativos (Android/iOS/Windows/macOS/web) a partir de
+# assets/icon/monkey_tech_icon.png. Rodar apos qualquer troca de logo:
+#   dart run flutter_launcher_icons
+flutter_launcher_icons:
+  image_path: "assets/icon/monkey_tech_icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true
+  windows:
+    generate: true
+  macos:
+    generate: true
+  web:
+    generate: true
+    background_color: "#000000"
+    theme_color: "#04BBD3"
 
 # The following section is specific to Flutter packages.
 flutter:
@@ -61,6 +80,9 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/images/monkey_tech_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:

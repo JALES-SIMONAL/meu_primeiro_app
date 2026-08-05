@@ -31,16 +31,12 @@ class SettingsPage extends ConsumerWidget {
                 value: 'Monkey Tech Data Logger',
               ),
               _SettingCard(
-                title: 'Base topic',
-                value: state.mqttSettings.baseTopic,
+                title: 'Bluetooth',
+                value: state.bleConnected ? 'Conectado' : 'Desconectado',
               ),
               _SettingCard(
-                title: 'Protocolo',
-                value: state.mqttSettings.protocol.name,
-              ),
-              _SettingCard(
-                title: 'Timeout MQTT',
-                value: '${state.mqttSettings.timeoutSeconds}s',
+                title: 'Dispositivo selecionado',
+                value: state.selectedDevice?.device.displayName ?? '---',
               ),
               _SettingCard(
                 title: 'Selecao bloqueada',
@@ -62,9 +58,8 @@ class SettingsPage extends ConsumerWidget {
                   Text(
                     'Os dados de cada dispositivo ficam separados por deviceId.',
                   ),
-                  Text('No Chrome, o MQTT deve usar WebSocket.'),
                   Text(
-                    'A logo foi substituida por um logo vetorial embutido porque nao havia BMP no workspace.',
+                    'A conexao com o equipamento e via Bluetooth Low Energy (BLE).',
                   ),
                 ],
               ),

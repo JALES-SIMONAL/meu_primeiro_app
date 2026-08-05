@@ -3,12 +3,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_controller.dart';
 import '../about/about_page.dart';
+import '../bluetooth/bluetooth_page.dart';
 import '../collection/collection_page.dart';
 import '../dashboard/dashboard_page.dart';
 import '../devices/devices_page.dart';
 import '../demo/demo_page.dart';
+import '../equipment/equipment_menu_page.dart';
 import '../logs/logs_page.dart';
-import '../mqtt/mqtt_page.dart';
 import '../settings/settings_page.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -24,7 +25,8 @@ class _AppShellState extends ConsumerState<AppShell> {
   static const _tabs = [
     _ShellTab(title: 'Dashboard', icon: Icons.dashboard_rounded),
     _ShellTab(title: 'Dispositivos', icon: Icons.devices_rounded),
-    _ShellTab(title: 'MQTT', icon: Icons.wifi_rounded),
+    _ShellTab(title: 'Bluetooth', icon: Icons.bluetooth_rounded),
+    _ShellTab(title: 'Equipamento', icon: Icons.tune_rounded),
     _ShellTab(title: 'Coleta', icon: Icons.storage_rounded),
     _ShellTab(title: 'Logs', icon: Icons.list_alt_rounded),
     _ShellTab(title: 'Configuracoes', icon: Icons.settings_rounded),
@@ -40,7 +42,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     final pages = <Widget>[
       const DashboardPage(),
       const DevicesPage(),
-      const MqttPage(),
+      const BluetoothPage(),
+      const EquipmentMenuPage(),
       const CollectionPage(),
       const LogsPage(),
       const SettingsPage(),
@@ -59,7 +62,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                 label: Text(
                   state.demoMode
                       ? 'Demo'
-                      : (state.mqttConnected ? 'MQTT' : 'Offline'),
+                      : (state.bleConnected ? 'Bluetooth' : 'Offline'),
                 ),
               ),
             ),
@@ -118,9 +121,9 @@ class _AppShellState extends ConsumerState<AppShell> {
       ),
       floatingActionButton: _index == 2
           ? FloatingActionButton.extended(
-              onPressed: () => controller.connectMqtt(),
-              icon: const Icon(Icons.link),
-              label: const Text('Conectar MQTT'),
+              onPressed: () => controller.startBleScan(),
+              icon: const Icon(Icons.bluetooth_searching),
+              label: const Text('Escanear Bluetooth'),
             )
           : null,
     );

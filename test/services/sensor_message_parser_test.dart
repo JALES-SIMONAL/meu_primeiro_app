@@ -5,64 +5,48 @@ import 'package:meu_primeiro_app/services/sensor_message_parser.dart';
 void main() {
   final parser = SensorMessageParser();
 
-  test('parses single sensor message', () {
-    final result = parser.parse({
-      'deviceId': 'esp32_001',
-      'sensor': 1,
-      'state': 'H',
-      'timestampMs': 15480,
-    }, topicDeviceId: 'esp32_001');
+  test('parses a firmware event payload', () {
+    final result = parser.parseEvent({
+      'canal': 1,
+      'estado': 'H',
+      'tempo_us': 15480000,
+    });
 
     expect(result.isAccepted, isTrue);
-    expect(result.readings, hasLength(1));
-    expect(result.readings.single.state, SensorState.high);
+    expect(result.reading!.sensor, 1);
+    expect(result.reading!.state, SensorState.high);
+    expect(result.reading!.timestampMs, 15480);
   });
 
-  test('parses six sensors in one message', () {
-    final result = parser.parse({
-      'deviceId': 'esp32_001',
-      'timestampMs': 18500,
-      'sensors': [
-        {'sensor': 1, 'state': 'H'},
-        {'sensor': 2, 'state': 'L'},
-        {'sensor': 3, 'state': 'H'},
-        {'sensor': 4, 'state': 'H'},
-        {'sensor': 5, 'state': 'L'},
-        {'sensor': 6, 'state': 'L'},
-      ],
-    }, topicDeviceId: 'esp32_001');
+  test('rejects channel out of range', () {
+    final result = parser.parseEvent({
+      'canal': 7,
+      'estado': 'H',
+      'tempo_us': 1000,
+    });
 
-    expect(result.isAccepted, isTrue);
-    expect(result.readings, hasLength(6));
+    expect(result.rejectReason, RejectReason.sensorOutOfRange);
   });
 
-  test('rejects missing fields and invalid sensors', () {
-    expect(
-      parser.parse({
-        'sensor': 1,
-        'state': 'H',
-        'timestampMs': 1,
-      }, topicDeviceId: 'esp32_001').rejectReason,
-      RejectReason.missingDeviceId,
-    );
+  test('rejects missing state', () {
+    final result = parser.parseEvent({'canal': 1, 'tempo_us': 1000});
 
-    expect(
-      parser.parse({
-        'deviceId': 'esp32_001',
-        'sensor': 1,
-        'state': 'H',
-      }, topicDeviceId: 'esp32_001').rejectReason,
-      RejectReason.missingTimestamp,
-    );
+    expect(result.rejectReason, RejectReason.missingState);
+  });
 
-    expect(
-      parser.parse({
-        'deviceId': 'esp32_001',
-        'sensor': 7,
-        'state': 'H',
-        'timestampMs': 1,
-      }, topicDeviceId: 'esp32_001').rejectReason,
-      RejectReason.sensorOutOfRange,
-    );
+  test('rejects invalid state', () {
+    final result = parser.parseEvent({
+      'canal': 1,
+      'estado': 'X',
+      'tempo_us': 1000,
+    });
+
+    expect(result.rejectReason, RejectReason.invalidState);
+  });
+
+  test('rejects malformed payload missing tempo_us', () {
+    final result = parser.parseEvent({'canal': 1, 'estado': 'H'});
+
+    expect(result.rejectReason, RejectReason.malformed);
   });
 }

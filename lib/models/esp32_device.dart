@@ -1,3 +1,6 @@
+/// Modo de operação reportado pelo firmware (configuracoes::ModoOperacao).
+enum DeviceOperationMode { hardware, app }
+
 class Esp32Device {
   final String deviceId;
   final String? name;
@@ -9,6 +12,24 @@ class Esp32Device {
   final int? uptimeMs;
   final int bootSession;
 
+  // Telemetria vinda do "topico":"state" do firmware (bluetooth_app.cpp::publicarEstado).
+  final DeviceOperationMode? operationMode;
+  final int? brightness;
+  final int? volume;
+  final bool? sdCardAvailable;
+  final int? sdErrorCount;
+  final bool? experimentActive;
+  final int? repetitionCurrent;
+  final int? repetitionsTotal;
+  final int? experimentElapsedSeconds;
+  final int? sdUsedKb;
+  final int? sdTotalKb;
+
+  // Dados estáticos vindos do "topico":"info" (bluetooth_app.cpp::publicarInfoDispositivo),
+  // enviados uma única vez logo após conectar.
+  final String? author;
+  final String? manualUrl;
+
   const Esp32Device({
     required this.deviceId,
     this.name,
@@ -19,6 +40,19 @@ class Esp32Device {
     this.lastSeen,
     this.uptimeMs,
     this.bootSession = 1,
+    this.operationMode,
+    this.brightness,
+    this.volume,
+    this.sdCardAvailable,
+    this.sdErrorCount,
+    this.experimentActive,
+    this.repetitionCurrent,
+    this.repetitionsTotal,
+    this.experimentElapsedSeconds,
+    this.sdUsedKb,
+    this.sdTotalKb,
+    this.author,
+    this.manualUrl,
   });
 
   String get displayName {
@@ -35,6 +69,19 @@ class Esp32Device {
     DateTime? lastSeen,
     int? uptimeMs,
     int? bootSession,
+    DeviceOperationMode? operationMode,
+    int? brightness,
+    int? volume,
+    bool? sdCardAvailable,
+    int? sdErrorCount,
+    bool? experimentActive,
+    int? repetitionCurrent,
+    int? repetitionsTotal,
+    int? experimentElapsedSeconds,
+    int? sdUsedKb,
+    int? sdTotalKb,
+    String? author,
+    String? manualUrl,
   }) {
     return Esp32Device(
       deviceId: deviceId,
@@ -46,6 +93,20 @@ class Esp32Device {
       lastSeen: lastSeen ?? this.lastSeen,
       uptimeMs: uptimeMs ?? this.uptimeMs,
       bootSession: bootSession ?? this.bootSession,
+      operationMode: operationMode ?? this.operationMode,
+      brightness: brightness ?? this.brightness,
+      volume: volume ?? this.volume,
+      sdCardAvailable: sdCardAvailable ?? this.sdCardAvailable,
+      sdErrorCount: sdErrorCount ?? this.sdErrorCount,
+      experimentActive: experimentActive ?? this.experimentActive,
+      repetitionCurrent: repetitionCurrent ?? this.repetitionCurrent,
+      repetitionsTotal: repetitionsTotal ?? this.repetitionsTotal,
+      experimentElapsedSeconds:
+          experimentElapsedSeconds ?? this.experimentElapsedSeconds,
+      sdUsedKb: sdUsedKb ?? this.sdUsedKb,
+      sdTotalKb: sdTotalKb ?? this.sdTotalKb,
+      author: author ?? this.author,
+      manualUrl: manualUrl ?? this.manualUrl,
     );
   }
 }

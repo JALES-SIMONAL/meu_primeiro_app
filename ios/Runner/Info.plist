@@ -4,6 +4,10 @@
 <dict>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Este app usa Bluetooth para conectar ao equipamento Gerador_UFRN_BT.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Este app usa Bluetooth para conectar ao equipamento Gerador_UFRN_BT.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>

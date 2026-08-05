@@ -167,9 +167,9 @@ class _HeroCard extends StatelessWidget {
                       label: state.demoMode ? 'Demo ativa' : 'Demo inativa',
                     ),
                     _HeaderChip(
-                      label: state.mqttConnected
-                          ? 'MQTT conectado'
-                          : 'MQTT offline',
+                      label: state.bleConnected
+                          ? 'Bluetooth conectado'
+                          : 'Bluetooth offline',
                     ),
                     _HeaderChip(
                       label:
