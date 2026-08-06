@@ -15,7 +15,7 @@ class EquipmentMenuPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appControllerProvider);
-    final enabled = state.bleConnected && !state.demoMode;
+    final enabled = state.bleConnected;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -26,9 +26,7 @@ class EquipmentMenuPage extends ConsumerWidget {
             title: 'Equipamento',
             subtitle: enabled
                 ? 'Conectado a ${state.selectedDevice?.device.displayName ?? "-"}.'
-                : (state.demoMode
-                      ? 'Indisponivel em modo demonstracao.'
-                      : 'Conecte via Bluetooth para operar o equipamento.'),
+                : 'Conecte via Bluetooth para operar o equipamento.',
           ),
           const SizedBox(height: 16),
           _MenuTile(

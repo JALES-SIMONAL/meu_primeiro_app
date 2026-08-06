@@ -5,9 +5,7 @@ import '../../providers/app_controller.dart';
 import '../about/about_page.dart';
 import '../bluetooth/bluetooth_page.dart';
 import '../collection/collection_page.dart';
-import '../dashboard/dashboard_page.dart';
 import '../devices/devices_page.dart';
-import '../demo/demo_page.dart';
 import '../equipment/equipment_menu_page.dart';
 import '../logs/logs_page.dart';
 import '../settings/settings_page.dart';
@@ -23,14 +21,12 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
 
   static const _tabs = [
-    _ShellTab(title: 'Dashboard', icon: Icons.dashboard_rounded),
     _ShellTab(title: 'Dispositivos', icon: Icons.devices_rounded),
     _ShellTab(title: 'Bluetooth', icon: Icons.bluetooth_rounded),
     _ShellTab(title: 'Equipamento', icon: Icons.tune_rounded),
     _ShellTab(title: 'Coleta', icon: Icons.storage_rounded),
     _ShellTab(title: 'Logs', icon: Icons.list_alt_rounded),
     _ShellTab(title: 'Configuracoes', icon: Icons.settings_rounded),
-    _ShellTab(title: 'Demo', icon: Icons.science_rounded),
     _ShellTab(title: 'Sobre', icon: Icons.info_rounded),
   ];
 
@@ -40,14 +36,12 @@ class _AppShellState extends ConsumerState<AppShell> {
     final controller = ref.read(appControllerProvider.notifier);
 
     final pages = <Widget>[
-      const DashboardPage(),
       const DevicesPage(),
       const BluetoothPage(),
       const EquipmentMenuPage(),
       const CollectionPage(),
       const LogsPage(),
       const SettingsPage(),
-      const DemoPage(),
       const AboutPage(),
     ];
 
@@ -59,11 +53,7 @@ class _AppShellState extends ConsumerState<AppShell> {
             padding: const EdgeInsets.only(right: 8),
             child: Center(
               child: Chip(
-                label: Text(
-                  state.demoMode
-                      ? 'Demo'
-                      : (state.bleConnected ? 'Bluetooth' : 'Offline'),
-                ),
+                label: Text(state.bleConnected ? 'Bluetooth' : 'Offline'),
               ),
             ),
           ),
@@ -119,7 +109,7 @@ class _AppShellState extends ConsumerState<AppShell> {
           );
         },
       ),
-      floatingActionButton: _index == 2
+      floatingActionButton: _index == 1
           ? FloatingActionButton.extended(
               onPressed: () => controller.startBleScan(),
               icon: const Icon(Icons.bluetooth_searching),

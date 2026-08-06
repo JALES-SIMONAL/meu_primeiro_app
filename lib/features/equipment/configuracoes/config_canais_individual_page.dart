@@ -5,11 +5,26 @@ import '../../../models/channel_edge_mode.dart';
 import '../../../providers/app_controller.dart';
 
 /// Equivalente a maquina_estados::Tela::ConfigCanaisIndividualLista.
-class ConfigCanaisIndividualPage extends ConsumerWidget {
+class ConfigCanaisIndividualPage extends ConsumerStatefulWidget {
   const ConfigCanaisIndividualPage({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ConfigCanaisIndividualPage> createState() =>
+      _ConfigCanaisIndividualPageState();
+}
+
+class _ConfigCanaisIndividualPageState
+    extends ConsumerState<ConfigCanaisIndividualPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(appControllerProvider.notifier).getChannels();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(appControllerProvider);
     final channelCount = state.selectedDevice?.device.channelCount ?? 6;
     final configs = {for (final c in state.channelConfigs) c.channel: c.mode};

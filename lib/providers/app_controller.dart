@@ -13,11 +13,10 @@ import '../models/collection_session.dart';
 import '../models/device_file.dart';
 import '../models/esp32_device.dart';
 import '../models/esp32_device_state.dart';
+import '../models/file_data_row.dart';
 import '../models/sensor_record.dart';
-import '../models/sensor_state.dart';
 import '../services/bluetooth_service.dart';
 import '../services/csv_service.dart';
-import '../services/demo_service.dart';
 import '../services/sensor_message_parser.dart';
 import '../core/utils/formatters.dart';
 
@@ -27,26 +26,21 @@ final appControllerProvider = NotifierProvider<AppController, AppState>(
 
 class AppController extends Notifier<AppState> {
   AppController({
-    DemoService? demoService,
     BluetoothAppService? bluetoothService,
     CsvService? csvService,
     SensorMessageParser? parser,
-  }) : _demoService = demoService ?? DemoService(),
-       _bluetoothService = bluetoothService ?? FlutterBlueService(),
+  }) : _bluetoothService = bluetoothService ?? FlutterBlueService(),
        _csvService = csvService ?? CsvService(),
        _parser = parser ?? SensorMessageParser();
 
-  final DemoService _demoService;
   final BluetoothAppService _bluetoothService;
   final CsvService _csvService;
   final SensorMessageParser _parser;
   final Uuid _uuid = const Uuid();
 
-  Timer? _demoTimer;
   StreamSubscription<BleConnectionStateUi>? _bleConnectionSubscription;
   StreamSubscription<String>? _bleLinesSubscription;
   StreamSubscription<List<BleDeviceInfo>>? _bleScanResultsSubscription;
-  final Map<String, int> _demoTimestampByDevice = {};
   final Map<String, String> _knownDeviceNames = {};
 
   // Guarda o último dispositivo conectado: quando a conexão BLE cai, o
@@ -69,22 +63,13 @@ class AppController extends Notifier<AppState> {
   }
 
   void shutdown() {
-    _demoTimer?.cancel();
     _bleConnectionSubscription?.cancel();
     _bleLinesSubscription?.cancel();
     _bleScanResultsSubscription?.cancel();
     _bluetoothService.disconnect();
   }
 
-  static Map<String, Esp32DeviceState> _buildInitialDevices() {
-    final demoDevices = DemoService(seed: 42).createDemoDevices();
-    return {
-      for (final device in demoDevices)
-        device.deviceId: Esp32DeviceState.initial(
-          device.copyWith(isOnline: false),
-        ),
-    };
-  }
+  static Map<String, Esp32DeviceState> _buildInitialDevices() => {};
 
   void addLog(String message, {AppLogLevel level = AppLogLevel.info}) {
     final updatedLogs = List<AppLogEntry>.from(state.logs)
@@ -158,49 +143,10 @@ class AppController extends Notifier<AppState> {
     addLog('Bluetooth desconectado.', level: AppLogLevel.info);
   }
 
-  void toggleDemoMode(bool enabled) {
-    if (enabled == state.demoMode) return;
-
-    state = state.copyWith(demoMode: enabled);
-    if (enabled) {
-      addLog('Modo demonstracao ativado.', level: AppLogLevel.success);
-      _seedDemoDevices();
-      _startDemoTimer();
-    } else {
-      _demoTimer?.cancel();
-      _demoTimer = null;
-      addLog('Modo demonstracao desativado.', level: AppLogLevel.info);
-    }
-  }
-
-  void _seedDemoDevices() {
-    final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices);
-    for (final device in updatedDevices.values) {
-      if (!device.device.deviceId.startsWith('esp32_demo_')) continue;
-      updatedDevices[device.device.deviceId] = device.copyWith(
-        device: device.device.copyWith(
-          isOnline: true,
-          lastSeen: DateTime.now(),
-          firmwareVersion: device.device.firmwareVersion ?? '1.0.0-demo',
-        ),
-      );
-    }
-    state = state.copyWith(devices: updatedDevices);
-  }
-
-  void _startDemoTimer() {
-    _demoTimer?.cancel();
-    _demoTimer = Timer.periodic(
-      const Duration(seconds: 1),
-      (_) => _emitDemoSnapshot(),
-    );
-  }
-
   void simulateDeviceReboot(String deviceId) {
     final deviceState = state.devices[deviceId];
     if (deviceState == null) return;
 
-    _demoTimestampByDevice[deviceId] = 0;
     final updatedDevice = deviceState.copyWith(
       device: deviceState.device.copyWith(
         bootSession: deviceState.device.bootSession + 1,
@@ -359,6 +305,9 @@ class AppController extends Notifier<AppState> {
       case 'analise_eventos':
         _handleAnaliseEventosMessage(json);
         break;
+      case 'dados_arquivo':
+        _handleDadosArquivoMessage(json);
+        break;
       default:
         break;
     }
@@ -474,6 +423,8 @@ class AppController extends Notifier<AppState> {
       macAddress: payload['mac']?.toString() ?? deviceState.device.macAddress,
       manualUrl:
           payload['manual_url']?.toString() ?? deviceState.device.manualUrl,
+      bleDeviceName:
+          payload['nome_bt']?.toString() ?? deviceState.device.bleDeviceName,
     );
 
     final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
@@ -547,6 +498,45 @@ class AppController extends Notifier<AppState> {
     }
   }
 
+  /// JSON sob demanda ("topico":"dados_arquivo",
+  /// bluetooth_app.cpp::publicarDadosArquivo) — uma página da tabela rolante
+  /// de dados do arquivo. offset==0 é sempre o início de uma nova consulta
+  /// (substitui as linhas atuais); offset>0 é a próxima página (acrescenta).
+  void _handleDadosArquivoMessage(Map<String, dynamic> payload) {
+    final linhas = payload['linhas'];
+    if (linhas is! List) return;
+
+    final offset = _asInt(payload['offset']) ?? 0;
+    final novasLinhas = <FileDataRow>[];
+    for (final item in linhas) {
+      if (item is! Map) continue;
+      final repeticao = _asInt(item['repeticao']);
+      final canal = _asInt(item['canal']);
+      final estado = item['estado']?.toString();
+      final tempoUs = _asInt(item['tempo_us']);
+      if (repeticao == null || canal == null || estado == null || tempoUs == null) {
+        continue;
+      }
+      novasLinhas.add(
+        FileDataRow(
+          repetition: repeticao,
+          channel: canal,
+          state: estado,
+          timestampUs: tempoUs,
+        ),
+      );
+    }
+
+    final linhasCompletas = offset == 0
+        ? novasLinhas
+        : (List<FileDataRow>.from(state.fileDataRows)..addAll(novasLinhas));
+
+    state = state.copyWith(
+      fileDataRows: linhasCompletas,
+      fileDataHasMore: payload['tem_mais'] == true,
+    );
+  }
+
   /// Equivalente a analise_dados::calcularIntervalo +
   /// analise_dados::calcularVelocidade, calculado localmente em Dart — os
   /// dois eventos já chegaram ao app na mensagem "analise_eventos", então não
@@ -611,34 +601,6 @@ class AppController extends Notifier<AppState> {
     }
   }
 
-  void _emitDemoSnapshot() {
-    if (!state.demoMode) return;
-
-    final demoDevices = state.devices.values.where(
-      (deviceState) => deviceState.device.deviceId.startsWith('esp32_demo_'),
-    );
-    for (final deviceState in demoDevices) {
-      final deviceId = deviceState.device.deviceId;
-      final currentTimestamp = _demoTimestampByDevice[deviceId] ?? 0;
-      final nextTimestamp = _demoService.nextTimestamp(currentTimestamp);
-      _demoTimestampByDevice[deviceId] = nextTimestamp;
-
-      for (var sensor = 1; sensor <= 6; sensor++) {
-        final currentState =
-            deviceState.channels[sensor]?.state ?? SensorState.low;
-        final nextState = _demoService.nextState(currentState);
-        _ingestReading(
-          deviceId,
-          ParsedReading(
-            sensor: sensor,
-            state: nextState,
-            timestampMs: nextTimestamp,
-          ),
-        );
-      }
-    }
-  }
-
   void startCollection({String? fileName, String delimiter = ';'}) {
     final selectedDeviceId = state.selectedDeviceId;
     if (selectedDeviceId == null) {
@@ -655,16 +617,15 @@ class AppController extends Notifier<AppState> {
       return;
     }
 
-    if (!state.bleConnected && !state.demoMode) {
+    if (!state.bleConnected) {
       addLog(
-        'Conecte via Bluetooth ou ative o modo demonstracao.',
+        'Conecte via Bluetooth para iniciar a coleta.',
         level: AppLogLevel.warning,
       );
       return;
     }
 
-    if (!(state.devices[selectedDeviceId]?.device.isOnline ?? false) &&
-        !state.demoMode) {
+    if (!(state.devices[selectedDeviceId]?.device.isOnline ?? false)) {
       addLog(
         'O dispositivo selecionado esta offline.',
         level: AppLogLevel.warning,
@@ -766,13 +727,6 @@ class AppController extends Notifier<AppState> {
       );
       return;
     }
-    if (state.demoMode) {
-      addLog(
-        'Comandos Bluetooth sao ignorados em modo demonstracao.',
-        level: AppLogLevel.warning,
-      );
-      return;
-    }
     if (!state.bleConnected) {
       addLog('Bluetooth desconectado: comando nao enviado.', level: AppLogLevel.warning);
       return;
@@ -811,6 +765,11 @@ class AppController extends Notifier<AppState> {
   void finishRepetition() => _sendCommand({'action': 'finish_repetition'});
   void reconnectDevice() => _sendCommand({'action': 'reconnect'});
 
+  /// Troca o nome anunciado no BLE (persistido no equipamento) — o mesmo
+  /// efeito do "Renomear" na tela física "Conexao com app".
+  void setDeviceName(String nome) =>
+      _sendCommand({'action': 'set_device_name', 'nome': nome});
+
   void setChannelMode(int canal, ChannelEdgeMode modo) => _sendCommand({
     'action': 'set_channel_mode',
     'channel': canal,
@@ -824,6 +783,12 @@ class AppController extends Notifier<AppState> {
 
   void restoreChannelDefaults() =>
       _sendCommand({'action': 'restore_channel_defaults'});
+
+  /// Pede a config. de canais atual sob demanda — chamado ao abrir uma tela
+  /// que exibe esse estado, para nunca mostrar um valor obsoleto (de antes
+  /// da conexão, ou de uma mudança feita pelo encoder local enquanto o app
+  /// estava em outra tela/desconectado).
+  void getChannels() => _sendCommand({'action': 'get_channels'});
 
   void listFiles() => _sendCommand({'action': 'list_files'});
 
@@ -840,6 +805,15 @@ class AppController extends Notifier<AppState> {
     'action': 'load_repetition',
     'arquivo': arquivo,
     'repeticao': repeticao,
+  });
+
+  /// Pede uma página (offset em linhas de dados) da tabela rolante de dados
+  /// do arquivo. offset==0 começa uma nova consulta (a resposta substitui
+  /// `fileDataRows`); offset>0 é rolagem/paginação (a resposta acrescenta).
+  void readFileData(String arquivo, int offset) => _sendCommand({
+    'action': 'read_file_data',
+    'arquivo': arquivo,
+    'offset': offset,
   });
 
   void _appendCollectionRecord(SensorRecord record) {

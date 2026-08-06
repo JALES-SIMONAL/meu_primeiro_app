@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/device_file.dart';
 import '../../../providers/app_controller.dart';
+import 'arquivo_dados_page.dart';
 import 'arquivo_renomear_page.dart';
 
 /// Equivalente a maquina_estados::Tela::ArquivoDetalhe +
@@ -22,6 +23,15 @@ class ArquivoDetalhePage extends ConsumerWidget {
         children: [
           ListTile(title: Text('Tamanho: ${arquivo.sizeBytes} bytes')),
           const Divider(),
+          ListTile(
+            leading: const Icon(Icons.table_rows_outlined),
+            title: const Text('Ver dados'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => ArquivoDadosPage(arquivo: arquivo.name),
+              ),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.edit_outlined),
             title: const Text('Renomear'),

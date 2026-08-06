@@ -26,9 +26,10 @@ class Esp32Device {
   final int? sdTotalKb;
 
   // Dados estáticos vindos do "topico":"info" (bluetooth_app.cpp::publicarInfoDispositivo),
-  // enviados uma única vez logo após conectar.
+  // enviados uma única vez logo após conectar (e de novo se o nome BLE mudar).
   final String? author;
   final String? manualUrl;
+  final String? bleDeviceName;
 
   const Esp32Device({
     required this.deviceId,
@@ -53,6 +54,7 @@ class Esp32Device {
     this.sdTotalKb,
     this.author,
     this.manualUrl,
+    this.bleDeviceName,
   });
 
   String get displayName {
@@ -82,6 +84,7 @@ class Esp32Device {
     int? sdTotalKb,
     String? author,
     String? manualUrl,
+    String? bleDeviceName,
   }) {
     return Esp32Device(
       deviceId: deviceId,
@@ -107,6 +110,7 @@ class Esp32Device {
       sdTotalKb: sdTotalKb ?? this.sdTotalKb,
       author: author ?? this.author,
       manualUrl: manualUrl ?? this.manualUrl,
+      bleDeviceName: bleDeviceName ?? this.bleDeviceName,
     );
   }
 }

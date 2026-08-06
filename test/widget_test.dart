@@ -7,8 +7,7 @@ void main() {
     await tester.pumpWidget(const ProviderScope(child: MonkeyTechApp()));
     await tester.pumpAndSettle();
 
-    expect(find.text('Monkey Tech Data Logger'), findsWidgets);
-    expect(find.text('Dashboard'), findsWidgets);
     expect(find.text('Dispositivos'), findsWidgets);
+    expect(find.text('Bluetooth'), findsWidgets);
   });
 }

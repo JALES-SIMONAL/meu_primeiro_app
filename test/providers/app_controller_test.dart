@@ -95,30 +95,15 @@ void main() {
     container.dispose();
   });
 
-  test('locks device selection during active collection', () {
-    controller.toggleDemoMode(true);
-    final firstDevice = controller.state.devices.keys.first;
-    controller.selectDevice(firstDevice);
+  test('locks device selection during active collection', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
     controller.startCollection(fileName: 'ensaio 01');
 
-    final otherDevice = controller.state.devices.keys.firstWhere(
-      (deviceId) => deviceId != firstDevice,
-    );
-    controller.selectDevice(otherDevice);
+    controller.selectDevice('OUTRO_ID');
 
-    expect(controller.state.selectedDeviceId, firstDevice);
+    expect(controller.state.selectedDeviceId, 'A1B2C3');
     expect(controller.state.collectionSession?.stage, CollectionStage.running);
-  });
-
-  test('demo mode can be enabled and records synthetic data', () async {
-    final selectedDevice = controller.state.devices.keys.first;
-    controller.selectDevice(selectedDevice);
-    controller.toggleDemoMode(true);
-
-    // O timer da demo dispara a cada 1s; aguarda o loop de eventos assentar.
-    await Future<void>.delayed(Duration.zero);
-
-    expect(controller.state.demoMode, isTrue);
   });
 
   test('startBleScan surfaces discovered devices in state', () async {
@@ -248,6 +233,7 @@ void main() {
         'device_id': 'A1B2C3',
         'mac': 'AA:BB:CC:DD:EE:FF',
         'manual_url': 'http://example.com/manual',
+        'nome_bt': 'Gerador_UFRN_BT',
       }),
     );
     await Future<void>.delayed(Duration.zero);
@@ -257,6 +243,18 @@ void main() {
     expect(device.author, 'Wilson Douglas Jales Simonal');
     expect(device.macAddress, 'AA:BB:CC:DD:EE:FF');
     expect(device.manualUrl, 'http://example.com/manual');
+    expect(device.bleDeviceName, 'Gerador_UFRN_BT');
+  });
+
+  test('setDeviceName sends the set_device_name command', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+
+    controller.setDeviceName('Novo_Nome_BT');
+
+    expect(fakeBt.sentCommands, [
+      {'action': 'set_device_name', 'nome': 'Novo_Nome_BT'},
+    ]);
   });
 
   test('ingests a firmware teste_canais message', () async {
@@ -277,6 +275,17 @@ void main() {
     expect(controller.state.channelLiveStates, hasLength(2));
     expect(controller.state.channelLiveStates[0].high, isTrue);
     expect(controller.state.channelLiveStates[0].changeCount, 5);
+  });
+
+  test('getChannels requests fresh channel config on demand', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+
+    controller.getChannels();
+
+    expect(fakeBt.sentCommands, [
+      {'action': 'get_channels'},
+    ]);
   });
 
   test('list_files/rename_file/delete_file send the expected commands and '
@@ -331,6 +340,51 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(controller.state.loadedAnalysisEvents, hasLength(2));
+  });
+
+  test('readFileData sends the command and dados_arquivo populates '
+      'fileDataRows (offset 0 replaces, offset>0 appends)', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+
+    controller.readFileData('ENSAIO1.CSV', 0);
+    expect(fakeBt.sentCommands, [
+      {'action': 'read_file_data', 'arquivo': 'ENSAIO1.CSV', 'offset': 0},
+    ]);
+
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'dados_arquivo',
+        'arquivo': 'ENSAIO1.CSV',
+        'offset': 0,
+        'linhas': [
+          {'repeticao': 0, 'canal': 1, 'estado': 'H', 'tempo_us': 1000},
+          {'repeticao': 0, 'canal': 1, 'estado': 'L', 'tempo_us': 4000},
+        ],
+        'tem_mais': true,
+      }),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.fileDataRows, hasLength(2));
+    expect(controller.state.fileDataHasMore, isTrue);
+
+    controller.readFileData('ENSAIO1.CSV', 2);
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'dados_arquivo',
+        'arquivo': 'ENSAIO1.CSV',
+        'offset': 2,
+        'linhas': [
+          {'repeticao': 1, 'canal': 2, 'estado': 'H', 'tempo_us': 8000},
+        ],
+        'tem_mais': false,
+      }),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.fileDataRows, hasLength(3));
+    expect(controller.state.fileDataHasMore, isFalse);
   });
 
   test('computeAnalysisResult replicates analise_dados.cpp formula', () {

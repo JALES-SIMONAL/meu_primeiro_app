@@ -5,6 +5,7 @@ import 'channel_live_state.dart';
 import 'collection_session.dart';
 import 'device_file.dart';
 import 'esp32_device_state.dart';
+import 'file_data_row.dart';
 import 'sensor_record.dart';
 import '../services/bluetooth_service.dart';
 
@@ -16,7 +17,6 @@ class AppState {
   final bool bleConnected;
   final bool bleScanning;
   final List<BleDeviceInfo> bleScanResults;
-  final bool demoMode;
   final CollectionSession? collectionSession;
   final Map<String, List<SensorRecord>> recordsByDevice;
   final List<AppLogEntry> logs;
@@ -28,6 +28,8 @@ class AppState {
   final List<DeviceFile> deviceFiles;
   final List<ChannelLiveState> channelLiveStates;
   final List<AnalysisEvent> loadedAnalysisEvents;
+  final List<FileDataRow> fileDataRows;
+  final bool fileDataHasMore;
 
   const AppState({
     required this.devices,
@@ -35,7 +37,6 @@ class AppState {
     required this.bleConnected,
     required this.bleScanning,
     required this.bleScanResults,
-    required this.demoMode,
     required this.collectionSession,
     required this.recordsByDevice,
     required this.logs,
@@ -44,6 +45,8 @@ class AppState {
     required this.deviceFiles,
     required this.channelLiveStates,
     required this.loadedAnalysisEvents,
+    required this.fileDataRows,
+    required this.fileDataHasMore,
   });
 
   factory AppState.initial({required Map<String, Esp32DeviceState> devices}) {
@@ -53,7 +56,6 @@ class AppState {
       bleConnected: false,
       bleScanning: false,
       bleScanResults: const [],
-      demoMode: false,
       collectionSession: null,
       recordsByDevice: {
         for (final deviceId in devices.keys) deviceId: <SensorRecord>[],
@@ -64,6 +66,8 @@ class AppState {
       deviceFiles: const [],
       channelLiveStates: const [],
       loadedAnalysisEvents: const [],
+      fileDataRows: const [],
+      fileDataHasMore: false,
     );
   }
 
@@ -79,7 +83,6 @@ class AppState {
     bool? bleConnected,
     bool? bleScanning,
     List<BleDeviceInfo>? bleScanResults,
-    bool? demoMode,
     Object? collectionSession = _unset,
     Map<String, List<SensorRecord>>? recordsByDevice,
     List<AppLogEntry>? logs,
@@ -88,6 +91,8 @@ class AppState {
     List<DeviceFile>? deviceFiles,
     List<ChannelLiveState>? channelLiveStates,
     List<AnalysisEvent>? loadedAnalysisEvents,
+    List<FileDataRow>? fileDataRows,
+    bool? fileDataHasMore,
   }) {
     return AppState(
       devices: devices ?? this.devices,
@@ -97,7 +102,6 @@ class AppState {
       bleConnected: bleConnected ?? this.bleConnected,
       bleScanning: bleScanning ?? this.bleScanning,
       bleScanResults: bleScanResults ?? this.bleScanResults,
-      demoMode: demoMode ?? this.demoMode,
       collectionSession: collectionSession == _unset
           ? this.collectionSession
           : collectionSession as CollectionSession?,
@@ -110,6 +114,8 @@ class AppState {
       deviceFiles: deviceFiles ?? this.deviceFiles,
       channelLiveStates: channelLiveStates ?? this.channelLiveStates,
       loadedAnalysisEvents: loadedAnalysisEvents ?? this.loadedAnalysisEvents,
+      fileDataRows: fileDataRows ?? this.fileDataRows,
+      fileDataHasMore: fileDataHasMore ?? this.fileDataHasMore,
     );
   }
 }
