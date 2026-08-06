@@ -84,11 +84,31 @@ class _ArquivoDadosPageState extends ConsumerState<ArquivoDadosPage> {
                   );
                 }
                 final linha = linhas[index];
-                return ListTile(
-                  dense: true,
-                  leading: Text('R${linha.repetition}'),
-                  title: Text('Canal ${linha.channel} ${linha.state}'),
-                  trailing: Text('${linha.timestampUs}us'),
+                final corDeFundo = index.isEven
+                    ? Colors.white
+                    : const Color(0xFFEFF2F4);
+                return Container(
+                  decoration: BoxDecoration(
+                    color: corDeFundo,
+                    border: Border(
+                      bottom: BorderSide(
+                        color: Theme.of(context).colorScheme.outline,
+                      ),
+                    ),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      SizedBox(width: 36, child: Text('R${linha.repetition}')),
+                      Expanded(
+                        child: Text('Canal ${linha.channel} ${linha.state}'),
+                      ),
+                      Text('${linha.timestampUs}us'),
+                    ],
+                  ),
                 );
               },
             ),

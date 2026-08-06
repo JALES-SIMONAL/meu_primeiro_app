@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/device_file.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 import 'arquivo_detalhe_page.dart';
 
 /// Equivalente a maquina_estados::Tela::GerenciamentoArquivos, alimentada
@@ -64,13 +65,13 @@ class DeviceFileListView extends ConsumerWidget {
     }
 
     return ListView(
+      padding: const EdgeInsets.all(12),
       children: [
         for (final arquivo in arquivos)
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.insert_drive_file_outlined),
             title: Text(arquivo.name),
             subtitle: Text('${arquivo.sizeBytes} bytes'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => onTap(arquivo),
           ),
       ],

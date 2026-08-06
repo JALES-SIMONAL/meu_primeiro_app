@@ -2,12 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_controller.dart';
-import '../about/about_page.dart';
 import '../bluetooth/bluetooth_page.dart';
 import '../collection/collection_page.dart';
 import '../devices/devices_page.dart';
 import '../equipment/equipment_menu_page.dart';
-import '../logs/logs_page.dart';
 import '../settings/settings_page.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -25,9 +23,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     _ShellTab(title: 'Bluetooth', icon: Icons.bluetooth_rounded),
     _ShellTab(title: 'Equipamento', icon: Icons.tune_rounded),
     _ShellTab(title: 'Coleta', icon: Icons.storage_rounded),
-    _ShellTab(title: 'Logs', icon: Icons.list_alt_rounded),
     _ShellTab(title: 'Configuracoes', icon: Icons.settings_rounded),
-    _ShellTab(title: 'Sobre', icon: Icons.info_rounded),
   ];
 
   @override
@@ -40,9 +36,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       const BluetoothPage(),
       const EquipmentMenuPage(),
       const CollectionPage(),
-      const LogsPage(),
       const SettingsPage(),
-      const AboutPage(),
     ];
 
     return Scaffold(

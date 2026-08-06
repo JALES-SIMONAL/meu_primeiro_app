@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_controller.dart';
 import '../../widgets/section_header.dart';
 import 'analise/analise_dados_page.dart';
-import 'configuracoes/configuracoes_page.dart';
 import 'experimentos/experimentos_page.dart';
 
 /// Equivalente a maquina_estados::Tela::MenuPrincipal: hub de onde se chega
@@ -29,16 +28,6 @@ class EquipmentMenuPage extends ConsumerWidget {
                 : 'Conecte via Bluetooth para operar o equipamento.',
           ),
           const SizedBox(height: 16),
-          _MenuTile(
-            icon: Icons.tune,
-            title: 'Configuracoes',
-            subtitle: 'Modo de operacao, brilho, volume, canais, sobre',
-            enabled: enabled,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
-            ),
-          ),
-          const SizedBox(height: 12),
           _MenuTile(
             icon: Icons.science_outlined,
             title: 'Experimentos',

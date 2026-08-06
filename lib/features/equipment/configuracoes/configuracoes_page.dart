@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 import 'config_canais_page.dart';
 import 'manual_page.dart';
 import 'modo_operacao_page.dart';
@@ -19,19 +20,18 @@ class ConfiguracoesPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Configuracoes')),
       body: ListView(
+        padding: const EdgeInsets.all(12),
         children: [
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.settings_input_component),
             title: const Text('Modo de operacao'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ModoOperacaoPage()),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.brightness_6),
             title: const Text('Brilho da tela'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => LevelEditPage(
@@ -42,10 +42,9 @@ class ConfiguracoesPage extends ConsumerWidget {
               ),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.volume_up),
             title: const Text('Volume'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => LevelEditPage(
@@ -56,26 +55,23 @@ class ConfiguracoesPage extends ConsumerWidget {
               ),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.sensors),
             title: const Text('Config. canais/sensores'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ConfigCanaisPage()),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.menu_book_outlined),
             title: const Text('Manual'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ManualPage()),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('Sobre'),
-            trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const SobrePage()),
             ),

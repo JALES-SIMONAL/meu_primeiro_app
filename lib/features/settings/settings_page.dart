@@ -3,7 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../models/collection_session.dart';
 import '../../providers/app_controller.dart';
+import '../../widgets/bordered_list_tile.dart';
 import '../../widgets/section_header.dart';
+import '../about/about_page.dart';
+import '../equipment/configuracoes/configuracoes_page.dart';
+import '../logs/logs_page.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
@@ -11,6 +15,7 @@ class SettingsPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appControllerProvider);
+    final equipamentoConectado = state.bleConnected;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(20),
@@ -63,6 +68,45 @@ class SettingsPage extends ConsumerWidget {
                   ),
                 ],
               ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SectionHeader(
+            title: 'Equipamento',
+            subtitle: equipamentoConectado
+                ? 'Configuracoes do equipamento conectado.'
+                : 'Conecte via Bluetooth para acessar as configuracoes do equipamento.',
+          ),
+          const SizedBox(height: 12),
+          BorderedListTile(
+            enabled: equipamentoConectado,
+            leading: const Icon(Icons.tune),
+            title: const Text('Configuracoes do equipamento'),
+            subtitle: const Text(
+              'Modo de operacao, brilho, volume, canais, manual, sobre',
+            ),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
+            ),
+          ),
+          const SizedBox(height: 24),
+          SectionHeader(
+            title: 'Aplicativo',
+            subtitle: 'Logs e informacoes gerais do app.',
+          ),
+          const SizedBox(height: 12),
+          BorderedListTile(
+            leading: const Icon(Icons.list_alt_rounded),
+            title: const Text('Logs'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LogsPage()),
+            ),
+          ),
+          BorderedListTile(
+            leading: const Icon(Icons.info_rounded),
+            title: const Text('Sobre'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const AboutPage()),
             ),
           ),
         ],

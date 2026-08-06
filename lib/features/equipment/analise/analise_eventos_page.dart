@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/analysis_event.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 import 'analise_distancia_page.dart';
 
 /// Equivalente a maquina_estados::Tela::AnaliseEventos: toque no primeiro
@@ -27,11 +28,12 @@ class _AnaliseEventosPageState extends ConsumerState<AnaliseEventosPage> {
       body: eventos.isEmpty
           ? const Center(child: Text('Repeticao sem eventos.'))
           : ListView.builder(
+              padding: const EdgeInsets.all(12),
               itemCount: eventos.length,
               itemBuilder: (context, index) {
                 final evento = eventos[index];
                 final marcado = identical(evento, _inicio);
-                return ListTile(
+                return BorderedListTile(
                   selected: marcado,
                   leading: Text('E$index'),
                   title: Text('Canal ${evento.channel} ${evento.state}'),

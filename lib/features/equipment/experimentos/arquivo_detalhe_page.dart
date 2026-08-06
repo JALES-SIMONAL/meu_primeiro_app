@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/device_file.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 import 'arquivo_dados_page.dart';
 import 'arquivo_renomear_page.dart';
 
@@ -22,8 +23,8 @@ class ArquivoDetalhePage extends ConsumerWidget {
       body: ListView(
         children: [
           ListTile(title: Text('Tamanho: ${arquivo.sizeBytes} bytes')),
-          const Divider(),
-          ListTile(
+          const SizedBox(height: 8),
+          BorderedListTile(
             leading: const Icon(Icons.table_rows_outlined),
             title: const Text('Ver dados'),
             onTap: () => Navigator.of(context).push(
@@ -32,7 +33,7 @@ class ArquivoDetalhePage extends ConsumerWidget {
               ),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.edit_outlined),
             title: const Text('Renomear'),
             onTap: () => Navigator.of(context).push(
@@ -41,7 +42,7 @@ class ArquivoDetalhePage extends ConsumerWidget {
               ),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.delete_outline),
             title: const Text('Excluir'),
             onTap: () async {

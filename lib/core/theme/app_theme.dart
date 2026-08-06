@@ -53,6 +53,7 @@ class AppTheme {
         surfaceTintColor: white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.all(Radius.circular(20)),
+          side: BorderSide(color: Color(0xFFCAD1D5)),
         ),
       ),
       navigationRailTheme: const NavigationRailThemeData(

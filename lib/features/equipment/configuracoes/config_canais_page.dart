@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 import 'config_canais_individual_page.dart';
 import 'config_canais_todos_page.dart';
 import 'config_canais_visualizar_page.dart';
@@ -17,15 +18,16 @@ class ConfigCanaisPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Config. canais/sensores')),
       body: ListView(
+        padding: const EdgeInsets.all(12),
         children: [
-          ListTile(
+          BorderedListTile(
             title: const Text('Configurar todos os canais'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ConfigCanaisTodosPage()),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             title: const Text('Configurar individualmente'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
@@ -34,7 +36,7 @@ class ConfigCanaisPage extends ConsumerWidget {
               ),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             title: const Text('Visualizar configuracao'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => Navigator.of(context).push(
@@ -43,7 +45,7 @@ class ConfigCanaisPage extends ConsumerWidget {
               ),
             ),
           ),
-          ListTile(
+          BorderedListTile(
             title: const Text('Restaurar config. padrao'),
             trailing: const Icon(Icons.restore),
             onTap: () async {

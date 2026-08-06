@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 
 /// Equivalente a maquina_estados::Tela::ConexaoApp.
 class ConexaoAppPage extends ConsumerWidget {
@@ -27,10 +28,11 @@ class ConexaoAppPage extends ConsumerWidget {
             title: const Text('Nome BLE'),
             trailing: Text(device?.bleDeviceName ?? '-'),
           ),
-          const Divider(),
-          ListTile(
+          const SizedBox(height: 8),
+          BorderedListTile(
             leading: const Icon(Icons.edit_outlined),
             title: const Text('Renomear'),
+            trailing: null,
             onTap: () async {
               final controllerTexto = TextEditingController(
                 text: device?.bleDeviceName ?? '',
@@ -63,9 +65,10 @@ class ConexaoAppPage extends ConsumerWidget {
               }
             },
           ),
-          ListTile(
+          BorderedListTile(
             leading: const Icon(Icons.sync),
             title: const Text('Reconectar'),
+            trailing: null,
             onTap: controller.reconnectDevice,
           ),
         ],

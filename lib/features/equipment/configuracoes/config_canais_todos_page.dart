@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../models/channel_edge_mode.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/bordered_list_tile.dart';
 
 /// Equivalente a maquina_estados::Tela::ConfigCanaisTodos +
 /// ConfigCanaisTodosConfirmar.
@@ -16,10 +17,12 @@ class ConfigCanaisTodosPage extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Configurar todos')),
       body: ListView(
+        padding: const EdgeInsets.all(12),
         children: [
           for (final modo in ChannelEdgeMode.values)
-            ListTile(
+            BorderedListTile(
               title: Text(modo.label),
+              trailing: null,
               onTap: () async {
                 final confirmar = await showDialog<bool>(
                   context: context,
