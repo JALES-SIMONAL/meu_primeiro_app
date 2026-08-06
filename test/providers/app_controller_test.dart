@@ -126,6 +126,38 @@ void main() {
     expect(deviceState!.device.isOnline, isTrue);
   });
 
+  test('connectToDevice sends set_datetime with the current local epoch',
+      () async {
+    // O firmware não tem fuso horário: o epoch enviado usa os campos do
+    // horário local do celular "disfarçados" de UTC (ver
+    // AppController.setDateTime), não o epoch UTC real.
+    int localComoUtcAgora() {
+      final agora = DateTime.now();
+      return DateTime.utc(
+        agora.year,
+        agora.month,
+        agora.day,
+        agora.hour,
+        agora.minute,
+        agora.second,
+      ).millisecondsSinceEpoch ~/
+          1000;
+    }
+
+    final beforeConnect = localComoUtcAgora();
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+    final afterConnect = localComoUtcAgora();
+
+    expect(fakeBt.sentCommands, hasLength(1));
+    final sent = fakeBt.sentCommands.single;
+    expect(sent['action'], 'set_datetime');
+    expect(
+      sent['epoch'],
+      inInclusiveRange(beforeConnect, afterConnect),
+    );
+  });
+
   test('ingests a real firmware event message', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
@@ -192,6 +224,7 @@ void main() {
   test('sendNext writes the command via the Bluetooth service', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
 
     controller.sendNext();
 
@@ -249,6 +282,7 @@ void main() {
   test('setDeviceName sends the set_device_name command', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
 
     controller.setDeviceName('Novo_Nome_BT');
 
@@ -280,6 +314,7 @@ void main() {
   test('getChannels requests fresh channel config on demand', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
 
     controller.getChannels();
 
@@ -292,6 +327,7 @@ void main() {
       'files message updates state', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
 
     controller.listFiles();
     controller.renameFile('OLD.CSV', 'novo');
@@ -322,6 +358,7 @@ void main() {
       'loadedAnalysisEvents', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
 
     controller.loadRepetition('ENSAIO1.CSV', 0);
     expect(fakeBt.sentCommands, [
@@ -346,6 +383,7 @@ void main() {
       'fileDataRows (offset 0 replaces, offset>0 appends)', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
 
     controller.readFileData('ENSAIO1.CSV', 0);
     expect(fakeBt.sentCommands, [

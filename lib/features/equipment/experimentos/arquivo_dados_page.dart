@@ -104,7 +104,13 @@ class _ArquivoDadosPageState extends ConsumerState<ArquivoDadosPage> {
                     children: [
                       SizedBox(width: 36, child: Text('R${linha.repetition}')),
                       Expanded(
-                        child: Text('Canal ${linha.channel} ${linha.state}'),
+                        child: Row(
+                          children: [
+                            Text('Canal ${linha.channel}'),
+                            const SizedBox(width: 24),
+                            Text(linha.state),
+                          ],
+                        ),
                       ),
                       Text('${linha.timestampUs}us'),
                     ],

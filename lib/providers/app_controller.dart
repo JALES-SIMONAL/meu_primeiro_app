@@ -242,6 +242,7 @@ class AppController extends Notifier<AppState> {
       ..[deviceId] = deviceState;
     state = state.copyWith(devices: updatedDevices);
     selectDevice(deviceId);
+    setDateTime();
   }
 
   void _handleBleDisconnected(String deviceId) {
@@ -769,6 +770,27 @@ class AppController extends Notifier<AppState> {
   /// efeito do "Renomear" na tela física "Conexao com app".
   void setDeviceName(String nome) =>
       _sendCommand({'action': 'set_device_name', 'nome': nome});
+
+  /// Informa a hora atual ao equipamento, que não tem RTC nem noção de fuso
+  /// horário próprios (formata o epoch recebido direto como UTC, ver
+  /// tempo.cpp). Por isso o epoch enviado aqui usa os campos do horário
+  /// *local* do celular "disfarçados" de UTC, para que a hora exibida no
+  /// equipamento bata com o relógio de parede do usuário em vez de UTC.
+  /// Enviado uma vez a cada conexão BLE (ver _handleBleConnected) para que o
+  /// nome sugerido de uma nova medição possa usar data/hora reais em vez de
+  /// cair no fallback "MEDICAOn".
+  void setDateTime() {
+    final agora = DateTime.now();
+    final epochLocalComoUtc = DateTime.utc(
+      agora.year,
+      agora.month,
+      agora.day,
+      agora.hour,
+      agora.minute,
+      agora.second,
+    ).millisecondsSinceEpoch ~/ 1000;
+    _sendCommand({'action': 'set_datetime', 'epoch': epochLocalComoUtc});
+  }
 
   void setChannelMode(int canal, ChannelEdgeMode modo) => _sendCommand({
     'action': 'set_channel_mode',
