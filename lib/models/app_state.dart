@@ -2,6 +2,7 @@ import 'analysis_event.dart';
 import 'app_log_entry.dart';
 import 'channel_edge_mode.dart';
 import 'channel_live_state.dart';
+import 'circular_analysis_result.dart';
 import 'collection_session.dart';
 import 'device_file.dart';
 import 'esp32_device_state.dart';
@@ -31,6 +32,20 @@ class AppState {
   final List<FileDataRow> fileDataRows;
   final bool fileDataHasMore;
 
+  // Análise de movimento circular (Raio/Vãos) — replica local de
+  // analise_circular.cpp (o firmware não expõe esse cálculo por BLE, só os
+  // eventos brutos por repetição). "circularPerRepetitionResults" guarda um
+  // item por repetição do arquivo (null = repetição com menos de 2 eventos),
+  // reaproveitado tanto para a tela "Resultado" quanto para montar a curva de
+  // um gráfico sem precisar buscar tudo de novo por BLE.
+  final bool circularAnalysisLoading;
+  final int circularRaioMm;
+  final int circularVaosQtd;
+  final CircularAverageResult? circularAverageResult;
+  final List<CircularCalcResult?> circularPerRepetitionResults;
+  final List<CircularPoint> circularGraphPoints;
+  final String? circularGraphTitle;
+
   const AppState({
     required this.devices,
     required this.selectedDeviceId,
@@ -47,6 +62,13 @@ class AppState {
     required this.loadedAnalysisEvents,
     required this.fileDataRows,
     required this.fileDataHasMore,
+    this.circularAnalysisLoading = false,
+    this.circularRaioMm = 10,
+    this.circularVaosQtd = 20,
+    this.circularAverageResult,
+    this.circularPerRepetitionResults = const [],
+    this.circularGraphPoints = const [],
+    this.circularGraphTitle,
   });
 
   factory AppState.initial({required Map<String, Esp32DeviceState> devices}) {
@@ -93,6 +115,13 @@ class AppState {
     List<AnalysisEvent>? loadedAnalysisEvents,
     List<FileDataRow>? fileDataRows,
     bool? fileDataHasMore,
+    bool? circularAnalysisLoading,
+    int? circularRaioMm,
+    int? circularVaosQtd,
+    Object? circularAverageResult = _unset,
+    List<CircularCalcResult?>? circularPerRepetitionResults,
+    List<CircularPoint>? circularGraphPoints,
+    Object? circularGraphTitle = _unset,
   }) {
     return AppState(
       devices: devices ?? this.devices,
@@ -116,6 +145,19 @@ class AppState {
       loadedAnalysisEvents: loadedAnalysisEvents ?? this.loadedAnalysisEvents,
       fileDataRows: fileDataRows ?? this.fileDataRows,
       fileDataHasMore: fileDataHasMore ?? this.fileDataHasMore,
+      circularAnalysisLoading:
+          circularAnalysisLoading ?? this.circularAnalysisLoading,
+      circularRaioMm: circularRaioMm ?? this.circularRaioMm,
+      circularVaosQtd: circularVaosQtd ?? this.circularVaosQtd,
+      circularAverageResult: circularAverageResult == _unset
+          ? this.circularAverageResult
+          : circularAverageResult as CircularAverageResult?,
+      circularPerRepetitionResults:
+          circularPerRepetitionResults ?? this.circularPerRepetitionResults,
+      circularGraphPoints: circularGraphPoints ?? this.circularGraphPoints,
+      circularGraphTitle: circularGraphTitle == _unset
+          ? this.circularGraphTitle
+          : circularGraphTitle as String?,
     );
   }
 }

@@ -233,6 +233,35 @@ void main() {
     ]);
   });
 
+  test('restartRepetition writes the command via the Bluetooth service',
+      () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
+
+    controller.restartRepetition();
+
+    expect(fakeBt.sentCommands, [
+      {'action': 'restart_repetition'},
+    ]);
+  });
+
+  test('startExperiment resends set_datetime before start_experiment',
+      () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
+
+    controller.startExperiment(3);
+
+    expect(fakeBt.sentCommands, hasLength(2));
+    expect(fakeBt.sentCommands[0]['action'], 'set_datetime');
+    expect(fakeBt.sentCommands[1], {
+      'action': 'start_experiment',
+      'repetitions': 3,
+    });
+  });
+
   test('ingests a firmware channels message', () async {
     await controller.connectToDevice('A1B2C3');
     await Future<void>.delayed(Duration.zero);
@@ -377,6 +406,84 @@ void main() {
     await Future<void>.delayed(Duration.zero);
 
     expect(controller.state.loadedAnalysisEvents, hasLength(2));
+  });
+
+  test('runCircularAnalysis loops load_repetition until an empty response '
+      'and aggregates the results', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
+
+    final future = controller.runCircularAnalysis(
+      'ENSAIO1.CSV',
+      raioMm: 100,
+      vaosQtd: 4,
+    );
+
+    // A parte síncrona de runCircularAnalysis (até o primeiro "await") já
+    // deve ter pedido a repetição 0 antes de suspender.
+    expect(fakeBt.sentCommands, [
+      {'action': 'load_repetition', 'arquivo': 'ENSAIO1.CSV', 'repeticao': 0},
+    ]);
+    expect(controller.state.circularAnalysisLoading, isTrue);
+
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'analise_eventos',
+        'eventos': [
+          {'canal': 1, 'estado': 'H', 'tempo_us': 0},
+          {'canal': 1, 'estado': 'L', 'tempo_us': 100000},
+          {'canal': 1, 'estado': 'H', 'tempo_us': 200000},
+        ],
+      }),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fakeBt.sentCommands, [
+      {'action': 'load_repetition', 'arquivo': 'ENSAIO1.CSV', 'repeticao': 0},
+      {'action': 'load_repetition', 'arquivo': 'ENSAIO1.CSV', 'repeticao': 1},
+    ]);
+
+    fakeBt.emitLine(jsonEncode({'topico': 'analise_eventos', 'eventos': []}));
+    await future;
+
+    expect(controller.state.circularAnalysisLoading, isFalse);
+    expect(controller.state.circularPerRepetitionResults, hasLength(1));
+    final media = controller.state.circularAverageResult;
+    expect(media, isNotNull);
+    expect(media!.repeticoesValidas, 1);
+    expect(media.repeticoesTotais, 1);
+    expect(media.velocidadeMediaMs, greaterThan(0));
+  });
+
+  test('loadCircularGraph exposes the points for the chosen series/repetition',
+      () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+
+    final future = controller.runCircularAnalysis(
+      'ENSAIO1.CSV',
+      raioMm: 100,
+      vaosQtd: 4,
+    );
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'analise_eventos',
+        'eventos': [
+          {'canal': 1, 'estado': 'H', 'tempo_us': 0},
+          {'canal': 1, 'estado': 'L', 'tempo_us': 100000},
+          {'canal': 1, 'estado': 'H', 'tempo_us': 200000},
+        ],
+      }),
+    );
+    await Future<void>.delayed(Duration.zero);
+    fakeBt.emitLine(jsonEncode({'topico': 'analise_eventos', 'eventos': []}));
+    await future;
+
+    controller.loadCircularGraph(kind: 'rpm', repeticaoIndice: 0);
+
+    expect(controller.state.circularGraphTitle, 'RPM');
+    expect(controller.state.circularGraphPoints, hasLength(2));
   });
 
   test('readFileData sends the command and dados_arquivo populates '

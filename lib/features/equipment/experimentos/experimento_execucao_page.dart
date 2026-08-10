@@ -67,6 +67,31 @@ class _ExperimentoExecucaoPageState
                       final confirmar = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
+                          title: const Text('Reiniciar repeticao?'),
+                          content: const Text(
+                            'Os eventos ja registrados nesta repeticao serao descartados.',
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(false),
+                              child: const Text('Nao'),
+                            ),
+                            FilledButton(
+                              onPressed: () => Navigator.of(context).pop(true),
+                              child: const Text('Sim'),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirmar == true) controller.restartRepetition();
+                    },
+                    child: const Text('Reiniciar repeticao'),
+                  ),
+                  OutlinedButton(
+                    onPressed: () async {
+                      final confirmar = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
                           title: const Text('Cancelar experimento?'),
                           actions: [
                             TextButton(

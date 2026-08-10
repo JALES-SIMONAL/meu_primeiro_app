@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_controller.dart';
 import '../experimentos/gerenciamento_arquivos_page.dart';
-import 'analise_selecionar_repeticao_page.dart';
+import 'analise_tipo_page.dart';
 
 /// Equivalente a maquina_estados::Tela::AnaliseSelecionarArquivo — reaproveita
 /// a mesma lista de arquivos do Gerenciamento (mensagem BLE "files").
@@ -30,8 +30,7 @@ class _AnaliseDadosPageState extends ConsumerState<AnaliseDadosPage> {
       body: DeviceFileListView(
         onTap: (arquivo) => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) =>
-                AnaliseSelecionarRepeticaoPage(arquivo: arquivo.name),
+            builder: (_) => AnaliseTipoPage(arquivo: arquivo.name),
           ),
         ),
       ),

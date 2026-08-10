@@ -9,6 +9,7 @@ import '../models/app_log_entry.dart';
 import '../models/app_state.dart';
 import '../models/channel_edge_mode.dart';
 import '../models/channel_live_state.dart';
+import '../models/circular_analysis_result.dart';
 import '../models/collection_session.dart';
 import '../models/device_file.dart';
 import '../models/esp32_device.dart';
@@ -16,9 +17,15 @@ import '../models/esp32_device_state.dart';
 import '../models/file_data_row.dart';
 import '../models/sensor_record.dart';
 import '../services/bluetooth_service.dart';
+import '../services/circular_analysis_calculator.dart';
 import '../services/csv_service.dart';
 import '../services/sensor_message_parser.dart';
 import '../core/utils/formatters.dart';
+
+/// Mesmo teto de experimentos::iniciar() / MAX_REPETICOES no firmware — limite
+/// de segurança para o loop que descobre quantas repetições um arquivo tem
+/// (ver AppController._descobrirRepeticoes).
+const int _kMaxRepeticoes = 100;
 
 final appControllerProvider = NotifierProvider<AppController, AppState>(
   AppController.new,
@@ -29,19 +36,28 @@ class AppController extends Notifier<AppState> {
     BluetoothAppService? bluetoothService,
     CsvService? csvService,
     SensorMessageParser? parser,
+    CircularAnalysisCalculator? circularCalculator,
   }) : _bluetoothService = bluetoothService ?? FlutterBlueService(),
        _csvService = csvService ?? CsvService(),
-       _parser = parser ?? SensorMessageParser();
+       _parser = parser ?? SensorMessageParser(),
+       _circularCalculator = circularCalculator ?? const CircularAnalysisCalculator();
 
   final BluetoothAppService _bluetoothService;
   final CsvService _csvService;
   final SensorMessageParser _parser;
+  final CircularAnalysisCalculator _circularCalculator;
   final Uuid _uuid = const Uuid();
 
   StreamSubscription<BleConnectionStateUi>? _bleConnectionSubscription;
   StreamSubscription<String>? _bleLinesSubscription;
   StreamSubscription<List<BleDeviceInfo>>? _bleScanResultsSubscription;
   final Map<String, String> _knownDeviceNames = {};
+
+  // Alimentado por _handleAnaliseEventosMessage — permite que
+  // _aguardarRepeticao() espere pela resposta de um "load_repetition"
+  // específico sem depender de polling do AppState.
+  final _analiseEventosController =
+      StreamController<List<AnalysisEvent>>.broadcast();
 
   // Guarda o último dispositivo conectado: quando a conexão BLE cai, o
   // serviço já pode ter limpo seu próprio estado interno, então o evento de
@@ -66,6 +82,7 @@ class AppController extends Notifier<AppState> {
     _bleConnectionSubscription?.cancel();
     _bleLinesSubscription?.cancel();
     _bleScanResultsSubscription?.cancel();
+    _analiseEventosController.close();
     _bluetoothService.disconnect();
   }
 
@@ -493,6 +510,7 @@ class AppController extends Notifier<AppState> {
       );
     }
     state = state.copyWith(loadedAnalysisEvents: events);
+    _analiseEventosController.add(events);
 
     if (events.isEmpty) {
       addLog('Repeticao sem eventos.', level: AppLogLevel.warning);
@@ -756,14 +774,25 @@ class AppController extends Notifier<AppState> {
     'value': appMode ? 1 : 0,
   });
 
-  void startExperiment(int repetitions) => _sendCommand({
-    'action': 'start_experiment',
-    'repetitions': repetitions,
-  });
+  void startExperiment(int repetitions) {
+    // Reenvia a hora antes de iniciar: se o "set_datetime" da conexao (ver
+    // _handleBleConnected) tiver se perdido (write BLE sem confirmacao), o
+    // nome do arquivo cairia no fallback "MEDICAOn" em vez de "Tddmmaaaa_hhmm"
+    // (ver tempo.cpp/maquina_estados::gerarNomeSugerido no firmware).
+    setDateTime();
+    _sendCommand({'action': 'start_experiment', 'repetitions': repetitions});
+  }
 
   void stopExperiment() => _sendCommand({'action': 'stop_experiment'});
   void cancelExperiment() => _sendCommand({'action': 'cancel_experiment'});
   void finishRepetition() => _sendCommand({'action': 'finish_repetition'});
+
+  /// Descarta os eventos ja coletados na repeticao atual e a reinicia do
+  /// zero, sem sair do experimento (equivalente ao "Reiniciar repeticao" da
+  /// tela fisica — maquina_estados::confirmarReiniciarRepeticaoSim /
+  /// CommandType::RestartRepetition).
+  void restartRepetition() => _sendCommand({'action': 'restart_repetition'});
+
   void reconnectDevice() => _sendCommand({'action': 'reconnect'});
 
   /// Troca o nome anunciado no BLE (persistido no equipamento) — o mesmo
@@ -828,6 +857,108 @@ class AppController extends Notifier<AppState> {
     'arquivo': arquivo,
     'repeticao': repeticao,
   });
+
+  /// Pede a repetição "repeticao" de "arquivo" e espera a resposta
+  /// "analise_eventos" correspondente (a característica BLE só tem uma
+  /// pergunta em voo por vez nesse protocolo, sem id de correlação — mesma
+  /// premissa de loadedAnalysisEvents). Array vazio de volta = repetição
+  /// inexistente (analise_dados::carregarRepeticao retornou 0 no firmware)
+  /// ou timeout (equipamento não respondeu).
+  Future<List<AnalysisEvent>> _aguardarRepeticao(
+    String arquivo,
+    int repeticao,
+  ) {
+    final resposta = _analiseEventosController.stream.first.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        addLog(
+          'Sem resposta do equipamento para a repeticao $repeticao de $arquivo.',
+          level: AppLogLevel.warning,
+        );
+        return const <AnalysisEvent>[];
+      },
+    );
+    loadRepetition(arquivo, repeticao);
+    return resposta;
+  }
+
+  /// Equivalente ao fluxo local "Raio e vaos" -> "Calcular" (tela física):
+  /// busca cada repetição de "arquivo" via BLE (o firmware não expõe
+  /// analise_circular por BLE, só os eventos brutos — ver
+  /// CircularAnalysisCalculator), reproduz localmente
+  /// analise_circular::calcular() para cada uma e depois a média entre as
+  /// repetições válidas (analise_circular::calcularMediaRepeticoes()).
+  Future<void> runCircularAnalysis(
+    String arquivo, {
+    required int raioMm,
+    required int vaosQtd,
+  }) async {
+    state = state.copyWith(
+      circularAnalysisLoading: true,
+      circularRaioMm: raioMm,
+      circularVaosQtd: vaosQtd,
+      circularAverageResult: null,
+      circularPerRepetitionResults: const [],
+    );
+
+    final raioMetros = raioMm / 1000.0;
+    final porRepeticao = <CircularCalcResult?>[];
+    for (var indice = 0; indice < _kMaxRepeticoes; indice++) {
+      final eventos = await _aguardarRepeticao(arquivo, indice);
+      if (eventos.isEmpty) break;
+      porRepeticao.add(
+        _circularCalculator.calcular(
+          eventos,
+          raioMetros: raioMetros,
+          vaos: vaosQtd,
+        ),
+      );
+    }
+
+    final media = _circularCalculator.calcularMediaRepeticoes(porRepeticao);
+    state = state.copyWith(
+      circularAnalysisLoading: false,
+      circularAverageResult: media,
+      circularPerRepetitionResults: porRepeticao,
+    );
+  }
+
+  /// Prepara os pontos do gráfico "kind" ('velocidade'/'aceleracao'/'rpm')
+  /// para exibição: de uma repetição específica (já calculada por
+  /// runCircularAnalysis, reaproveitada sem nova consulta BLE) ou a curva
+  /// média entre todas (repeticaoIndice==null — equivalente ao item "Media"
+  /// de Tela::AnaliseCircularEscolherRepeticao, analise_circular::calcularMediaGrafico()).
+  void loadCircularGraph({required String kind, int? repeticaoIndice}) {
+    final porRepeticao = state.circularPerRepetitionResults;
+    final resultado = repeticaoIndice == null
+        ? _circularCalculator.calcularMediaGrafico(
+            porRepeticao,
+            raioMetros: state.circularRaioMm / 1000.0,
+            vaos: state.circularVaosQtd,
+          )
+        : porRepeticao[repeticaoIndice];
+
+    final List<CircularPoint> pontos;
+    final String titulo;
+    switch (kind) {
+      case 'aceleracao':
+        pontos = resultado?.aceleracao ?? const [];
+        titulo = 'Aceleracao (m/s2)';
+        break;
+      case 'rpm':
+        pontos = resultado?.rpm ?? const [];
+        titulo = 'RPM';
+        break;
+      default:
+        pontos = resultado?.velocidade ?? const [];
+        titulo = 'Velocidade (m/s)';
+    }
+
+    state = state.copyWith(
+      circularGraphPoints: pontos,
+      circularGraphTitle: titulo,
+    );
+  }
 
   /// Pede uma página (offset em linhas de dados) da tabela rolante de dados
   /// do arquivo. offset==0 começa uma nova consulta (a resposta substitui
