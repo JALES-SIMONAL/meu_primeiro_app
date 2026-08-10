@@ -48,7 +48,9 @@ class _ExperimentoExecucaoPageState
                         'Repeticao ${device?.repetitionCurrent ?? '-'} de ${device?.repetitionsTotal ?? '-'}',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      Text('Tempo decorrido: ${device?.experimentElapsedSeconds ?? 0}s'),
+                      Text(
+                        'Tempo decorrido: ${device?.experimentElapsedSeconds ?? 0}s',
+                      ),
                     ],
                   ),
                 ),

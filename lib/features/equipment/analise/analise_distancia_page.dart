@@ -7,7 +7,11 @@ import 'analise_resultado_page.dart';
 
 /// Equivalente a maquina_estados::Tela::AnaliseDistancia.
 class AnaliseDistanciaPage extends ConsumerStatefulWidget {
-  const AnaliseDistanciaPage({super.key, required this.inicio, required this.fim});
+  const AnaliseDistanciaPage({
+    super.key,
+    required this.inicio,
+    required this.fim,
+  });
 
   final AnalysisEvent inicio;
   final AnalysisEvent fim;

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:uuid/uuid.dart';
 
 import '../models/analysis_event.dart';
 import '../models/app_log_entry.dart';
@@ -10,17 +9,12 @@ import '../models/app_state.dart';
 import '../models/channel_edge_mode.dart';
 import '../models/channel_live_state.dart';
 import '../models/circular_analysis_result.dart';
-import '../models/collection_session.dart';
 import '../models/device_file.dart';
 import '../models/esp32_device.dart';
 import '../models/esp32_device_state.dart';
 import '../models/file_data_row.dart';
-import '../models/sensor_record.dart';
 import '../services/bluetooth_service.dart';
 import '../services/circular_analysis_calculator.dart';
-import '../services/csv_service.dart';
-import '../services/sensor_message_parser.dart';
-import '../core/utils/formatters.dart';
 
 /// Mesmo teto de experimentos::iniciar() / MAX_REPETICOES no firmware — limite
 /// de segurança para o loop que descobre quantas repetições um arquivo tem
@@ -34,19 +28,13 @@ final appControllerProvider = NotifierProvider<AppController, AppState>(
 class AppController extends Notifier<AppState> {
   AppController({
     BluetoothAppService? bluetoothService,
-    CsvService? csvService,
-    SensorMessageParser? parser,
     CircularAnalysisCalculator? circularCalculator,
   }) : _bluetoothService = bluetoothService ?? FlutterBlueService(),
-       _csvService = csvService ?? CsvService(),
-       _parser = parser ?? SensorMessageParser(),
-       _circularCalculator = circularCalculator ?? const CircularAnalysisCalculator();
+       _circularCalculator =
+           circularCalculator ?? const CircularAnalysisCalculator();
 
   final BluetoothAppService _bluetoothService;
-  final CsvService _csvService;
-  final SensorMessageParser _parser;
   final CircularAnalysisCalculator _circularCalculator;
-  final Uuid _uuid = const Uuid();
 
   StreamSubscription<BleConnectionStateUi>? _bleConnectionSubscription;
   StreamSubscription<String>? _bleLinesSubscription;
@@ -109,17 +97,6 @@ class AppController extends Notifier<AppState> {
   }
 
   void selectDevice(String deviceId) {
-    final collection = state.collectionSession;
-    if (collection != null &&
-        collection.stage == CollectionStage.running &&
-        state.selectedDeviceId != deviceId) {
-      addLog(
-        'Selecao bloqueada durante a coleta ativa.',
-        level: AppLogLevel.warning,
-      );
-      return;
-    }
-
     if (!state.devices.containsKey(deviceId)) return;
     state = state.copyWith(selectedDeviceId: deviceId);
   }
@@ -158,42 +135,6 @@ class AppController extends Notifier<AppState> {
   Future<void> disconnectBluetooth() async {
     await _bluetoothService.disconnect();
     addLog('Bluetooth desconectado.', level: AppLogLevel.info);
-  }
-
-  void simulateDeviceReboot(String deviceId) {
-    final deviceState = state.devices[deviceId];
-    if (deviceState == null) return;
-
-    final updatedDevice = deviceState.copyWith(
-      device: deviceState.device.copyWith(
-        bootSession: deviceState.device.bootSession + 1,
-        uptimeMs: 0,
-        lastSeen: DateTime.now(),
-        isOnline: true,
-      ),
-      rebootCount: deviceState.rebootCount + 1,
-      lastTimestampMs: 0,
-      lastUptimeMs: 0,
-    );
-
-    final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
-      ..[deviceId] = updatedDevice;
-    state = state.copyWith(devices: updatedDevices);
-    addLog('Reinicio simulado para $deviceId.', level: AppLogLevel.warning);
-  }
-
-  void setDeviceOnline(String deviceId, bool online) {
-    final deviceState = state.devices[deviceId];
-    if (deviceState == null) return;
-
-    final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
-      ..[deviceId] = deviceState.copyWith(
-        device: deviceState.device.copyWith(
-          isOnline: online,
-          lastSeen: DateTime.now(),
-        ),
-      );
-    state = state.copyWith(devices: updatedDevices);
   }
 
   void _handleScanResults(List<BleDeviceInfo> results) {
@@ -292,7 +233,10 @@ class AppController extends Notifier<AppState> {
     try {
       final decoded = jsonDecode(line);
       if (decoded is! Map) {
-        addLog('Payload Bluetooth invalido recebido.', level: AppLogLevel.warning);
+        addLog(
+          'Payload Bluetooth invalido recebido.',
+          level: AppLogLevel.warning,
+        );
         return;
       }
       json = Map<String, dynamic>.from(decoded);
@@ -304,9 +248,6 @@ class AppController extends Notifier<AppState> {
     switch (json['topico']) {
       case 'state':
         _handleStateMessage(deviceId, json);
-        break;
-      case 'event':
-        _handleEventMessage(deviceId, json);
         break;
       case 'channels':
         _handleChannelsMessage(deviceId, json);
@@ -357,51 +298,27 @@ class AppController extends Notifier<AppState> {
       sdCardAvailable: payload['sd_disponivel'] is bool
           ? payload['sd_disponivel'] as bool
           : deviceState.device.sdCardAvailable,
-      sdErrorCount: _asInt(payload['sd_erros']) ?? deviceState.device.sdErrorCount,
+      sdErrorCount:
+          _asInt(payload['sd_erros']) ?? deviceState.device.sdErrorCount,
       experimentActive: payload['experimento_ativo'] is bool
           ? payload['experimento_ativo'] as bool
           : deviceState.device.experimentActive,
       repetitionCurrent:
-          _asInt(payload['repeticao_atual']) ?? deviceState.device.repetitionCurrent,
+          _asInt(payload['repeticao_atual']) ??
+          deviceState.device.repetitionCurrent,
       repetitionsTotal:
-          _asInt(payload['repeticoes_totais']) ?? deviceState.device.repetitionsTotal,
-      experimentElapsedSeconds: _asInt(payload['tempo_decorrido_s']) ??
+          _asInt(payload['repeticoes_totais']) ??
+          deviceState.device.repetitionsTotal,
+      experimentElapsedSeconds:
+          _asInt(payload['tempo_decorrido_s']) ??
           deviceState.device.experimentElapsedSeconds,
       sdUsedKb: _asInt(payload['sd_usado_kb']) ?? deviceState.device.sdUsedKb,
       sdTotalKb: _asInt(payload['sd_total_kb']) ?? deviceState.device.sdTotalKb,
     );
 
-    var channels = deviceState.channels;
-    if (channelCount != null &&
-        channelCount > 0 &&
-        channelCount != deviceState.channels.length) {
-      channels = {
-        for (var sensor = 1; sensor <= channelCount; sensor++)
-          sensor: deviceState.channels[sensor] ?? ChannelState.empty(sensor),
-      };
-    }
-
     final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
-      ..[deviceId] = deviceState.copyWith(device: device, channels: channels);
+      ..[deviceId] = deviceState.copyWith(device: device);
     state = state.copyWith(devices: updatedDevices);
-  }
-
-  /// JSON publicado por transição de canal ("topico":"event",
-  /// bluetooth_app.cpp::publicarEvento): `{"canal":N,"estado":"H"/"L","tempo_us":N}`.
-  void _handleEventMessage(String deviceId, Map<String, dynamic> payload) {
-    _ensureDevice(deviceId, online: true);
-
-    final result = _parser.parseEvent(payload);
-    if (!result.isAccepted) {
-      addLog(
-        'Evento rejeitado de $deviceId: ${result.rejectReason}',
-        level: AppLogLevel.warning,
-      );
-      _bumpInvalidCount(deviceId);
-      return;
-    }
-
-    _ingestReading(deviceId, result.reading!);
   }
 
   /// JSON publicado com a config de canais ("topico":"channels",
@@ -435,7 +352,8 @@ class AppController extends Notifier<AppState> {
 
     final device = deviceState.device.copyWith(
       name: payload['equipamento']?.toString() ?? deviceState.device.name,
-      firmwareVersion: payload['versao_firmware']?.toString() ??
+      firmwareVersion:
+          payload['versao_firmware']?.toString() ??
           deviceState.device.firmwareVersion,
       author: payload['autor']?.toString() ?? deviceState.device.author,
       macAddress: payload['mac']?.toString() ?? deviceState.device.macAddress,
@@ -533,7 +451,10 @@ class AppController extends Notifier<AppState> {
       final canal = _asInt(item['canal']);
       final estado = item['estado']?.toString();
       final tempoUs = _asInt(item['tempo_us']);
-      if (repeticao == null || canal == null || estado == null || tempoUs == null) {
+      if (repeticao == null ||
+          canal == null ||
+          estado == null ||
+          tempoUs == null) {
         continue;
       }
       novasLinhas.add(
@@ -573,164 +494,6 @@ class AppController extends Notifier<AppState> {
     return (deltaTUs: deltaTUs, velocidadeMs: velocidadeMs);
   }
 
-  void _ingestReading(String deviceId, ParsedReading reading) {
-    _ensureDevice(deviceId, online: true);
-
-    var workingDeviceState = state.devices[deviceId]!;
-    workingDeviceState = workingDeviceState.copyWith(
-      device: workingDeviceState.device.copyWith(
-        isOnline: true,
-        lastSeen: DateTime.now(),
-      ),
-    );
-
-    final nextChannelState = _updateChannel(
-      workingDeviceState.channels[reading.sensor],
-      reading,
-    );
-    final updatedChannels = Map<int, ChannelState>.from(
-      workingDeviceState.channels,
-    )..[reading.sensor] = nextChannelState;
-
-    final record = SensorRecord(
-      deviceId: deviceId,
-      sensor: reading.sensor,
-      state: reading.state,
-      timestampMs: reading.timestampMs,
-      receivedAt: DateTime.now(),
-      bootSession: workingDeviceState.device.bootSession,
-    );
-
-    workingDeviceState = workingDeviceState.copyWith(
-      channels: updatedChannels,
-      totalMessages: workingDeviceState.totalMessages + 1,
-      lastTimestampMs: reading.timestampMs,
-    );
-
-    final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
-      ..[deviceId] = workingDeviceState;
-    final updatedRecords = _appendRecords(deviceId, [record]);
-
-    state = state.copyWith(devices: updatedDevices, recordsByDevice: updatedRecords);
-
-    if (state.collectionSession != null &&
-        state.collectionSession!.stage == CollectionStage.running &&
-        state.collectionSession!.deviceId == deviceId) {
-      _appendCollectionRecord(record);
-    }
-  }
-
-  void startCollection({String? fileName, String delimiter = ';'}) {
-    final selectedDeviceId = state.selectedDeviceId;
-    if (selectedDeviceId == null) {
-      addLog(
-        'Selecione um dispositivo antes de iniciar a coleta.',
-        level: AppLogLevel.warning,
-      );
-      return;
-    }
-
-    if (state.collectionSession != null &&
-        state.collectionSession!.stage == CollectionStage.running) {
-      addLog('Ja existe uma coleta ativa.', level: AppLogLevel.warning);
-      return;
-    }
-
-    if (!state.bleConnected) {
-      addLog(
-        'Conecte via Bluetooth para iniciar a coleta.',
-        level: AppLogLevel.warning,
-      );
-      return;
-    }
-
-    if (!(state.devices[selectedDeviceId]?.device.isOnline ?? false)) {
-      addLog(
-        'O dispositivo selecionado esta offline.',
-        level: AppLogLevel.warning,
-      );
-      return;
-    }
-
-    final normalizedName = _csvService.suggestFileName(
-      selectedDeviceId,
-      label: sanitizeFileName(fileName ?? 'ensaio_01', fallback: 'ensaio_01'),
-    );
-
-    final session = CollectionSession.initial(
-      sessionId: _uuid.v4(),
-      deviceId: selectedDeviceId,
-      fileName: normalizedName,
-      delimiter: delimiter,
-      startedAt: DateTime.now(),
-    );
-    state = state.copyWith(collectionSession: session);
-    addLog(
-      'Coleta iniciada para $selectedDeviceId.',
-      level: AppLogLevel.success,
-    );
-  }
-
-  void pauseCollection() {
-    final session = state.collectionSession;
-    if (session == null || session.stage != CollectionStage.running) return;
-
-    state = state.copyWith(
-      collectionSession: session.copyWith(
-        stage: CollectionStage.paused,
-        pausedAt: DateTime.now(),
-      ),
-    );
-    addLog('Coleta pausada.', level: AppLogLevel.info);
-  }
-
-  void resumeCollection() {
-    final session = state.collectionSession;
-    if (session == null || session.stage != CollectionStage.paused) return;
-
-    state = state.copyWith(
-      collectionSession: session.copyWith(
-        stage: CollectionStage.running,
-        pausedAt: null,
-      ),
-    );
-    addLog('Coleta retomada.', level: AppLogLevel.info);
-  }
-
-  void finishCollection() {
-    final session = state.collectionSession;
-    if (session == null) return;
-
-    state = state.copyWith(
-      collectionSession: session.copyWith(stage: CollectionStage.finished),
-    );
-    addLog('Coleta finalizada.', level: AppLogLevel.success);
-  }
-
-  void cancelCollection() {
-    final session = state.collectionSession;
-    if (session == null) return;
-
-    state = state.copyWith(
-      collectionSession: session.copyWith(stage: CollectionStage.cancelled),
-    );
-    addLog('Coleta cancelada.', level: AppLogLevel.warning);
-  }
-
-  String buildSelectedDeviceCsv({String delimiter = ';'}) {
-    final selectedDeviceId = state.selectedDeviceId;
-    if (selectedDeviceId == null) return SensorRecord.csvHeader;
-    return _csvService.buildCsv(
-      state.recordsFor(selectedDeviceId),
-      delimiter: delimiter,
-    );
-  }
-
-  String suggestCollectionFileName() {
-    final selectedDeviceId = state.selectedDeviceId ?? 'dispositivo';
-    return _csvService.suggestFileName(selectedDeviceId);
-  }
-
   // ---------------------------------------------------------------------
   // Envio de comandos para o dispositivo selecionado (característica RX do
   // serviço BLE, bluetooth_app.cpp::processarLinha). Vocabulário de "action"
@@ -747,7 +510,10 @@ class AppController extends Notifier<AppState> {
       return;
     }
     if (!state.bleConnected) {
-      addLog('Bluetooth desconectado: comando nao enviado.', level: AppLogLevel.warning);
+      addLog(
+        'Bluetooth desconectado: comando nao enviado.',
+        level: AppLogLevel.warning,
+      );
       return;
     }
 
@@ -769,10 +535,8 @@ class AppController extends Notifier<AppState> {
   void setVolume(int nivel) =>
       _sendCommand({'action': 'set_volume', 'value': nivel});
 
-  void setOperationMode(bool appMode) => _sendCommand({
-    'action': 'set_operation_mode',
-    'value': appMode ? 1 : 0,
-  });
+  void setOperationMode(bool appMode) =>
+      _sendCommand({'action': 'set_operation_mode', 'value': appMode ? 1 : 0});
 
   void startExperiment(int repetitions) {
     // Reenvia a hora antes de iniciar: se o "set_datetime" da conexao (ver
@@ -810,14 +574,16 @@ class AppController extends Notifier<AppState> {
   /// cair no fallback "MEDICAOn".
   void setDateTime() {
     final agora = DateTime.now();
-    final epochLocalComoUtc = DateTime.utc(
-      agora.year,
-      agora.month,
-      agora.day,
-      agora.hour,
-      agora.minute,
-      agora.second,
-    ).millisecondsSinceEpoch ~/ 1000;
+    final epochLocalComoUtc =
+        DateTime.utc(
+          agora.year,
+          agora.month,
+          agora.day,
+          agora.hour,
+          agora.minute,
+          agora.second,
+        ).millisecondsSinceEpoch ~/
+        1000;
     _sendCommand({'action': 'set_datetime', 'epoch': epochLocalComoUtc});
   }
 
@@ -827,10 +593,8 @@ class AppController extends Notifier<AppState> {
     'mode': modo.value,
   });
 
-  void setAllChannelsMode(ChannelEdgeMode modo) => _sendCommand({
-    'action': 'set_all_channels_mode',
-    'mode': modo.value,
-  });
+  void setAllChannelsMode(ChannelEdgeMode modo) =>
+      _sendCommand({'action': 'set_all_channels_mode', 'mode': modo.value});
 
   void restoreChannelDefaults() =>
       _sendCommand({'action': 'restore_channel_defaults'});
@@ -843,11 +607,8 @@ class AppController extends Notifier<AppState> {
 
   void listFiles() => _sendCommand({'action': 'list_files'});
 
-  void renameFile(String from, String to) => _sendCommand({
-    'action': 'rename_file',
-    'from': from,
-    'to': to,
-  });
+  void renameFile(String from, String to) =>
+      _sendCommand({'action': 'rename_file', 'from': from, 'to': to});
 
   void deleteFile(String nome) =>
       _sendCommand({'action': 'delete_file', 'nome': nome});
@@ -969,21 +730,6 @@ class AppController extends Notifier<AppState> {
     'offset': offset,
   });
 
-  void _appendCollectionRecord(SensorRecord record) {
-    final session = state.collectionSession;
-    if (session == null) return;
-
-    final updatedSession = session.copyWith(
-      recordCount: session.recordCount + 1,
-      sizeEstimateBytes:
-          session.sizeEstimateBytes +
-          record.toCsvRow(delimiter: session.delimiter).length +
-          1,
-      lastRecord: record,
-    );
-    state = state.copyWith(collectionSession: updatedSession);
-  }
-
   void _ensureDevice(String deviceId, {bool online = true}) {
     if (state.devices.containsKey(deviceId)) return;
 
@@ -996,48 +742,6 @@ class AppController extends Notifier<AppState> {
     );
     final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
       ..[deviceId] = Esp32DeviceState.initial(device);
-    final updatedRecords = Map<String, List<SensorRecord>>.from(
-      state.recordsByDevice,
-    )..putIfAbsent(deviceId, () => <SensorRecord>[]);
-    state = state.copyWith(
-      devices: updatedDevices,
-      recordsByDevice: updatedRecords,
-    );
-  }
-
-  ChannelState _updateChannel(ChannelState? current, ParsedReading reading) {
-    final previousState = current?.state;
-    final changed = previousState != null && previousState != reading.state;
-    return (current ?? ChannelState.empty(reading.sensor)).copyWith(
-      state: reading.state,
-      timestampMs: reading.timestampMs,
-      receivedAt: DateTime.now(),
-      messageCount: (current?.messageCount ?? 0) + 1,
-      changeCount: (current?.changeCount ?? 0) + (changed ? 1 : 0),
-    );
-  }
-
-  Map<String, List<SensorRecord>> _appendRecords(
-    String deviceId,
-    List<SensorRecord> records,
-  ) {
-    final updated = Map<String, List<SensorRecord>>.from(state.recordsByDevice);
-    final current = List<SensorRecord>.from(
-      updated[deviceId] ?? const <SensorRecord>[],
-    );
-    current.addAll(records);
-    updated[deviceId] = current;
-    return updated;
-  }
-
-  void _bumpInvalidCount(String deviceId) {
-    final deviceState = state.devices[deviceId];
-    if (deviceState == null) return;
-
-    final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
-      ..[deviceId] = deviceState.copyWith(
-        totalInvalidMessages: deviceState.totalInvalidMessages + 1,
-      );
     state = state.copyWith(devices: updatedDevices);
   }
 

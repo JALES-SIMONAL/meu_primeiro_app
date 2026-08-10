@@ -23,7 +23,9 @@ class AnaliseCircularEscolherRepeticaoPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = ref.watch(
-      appControllerProvider.select((s) => s.circularPerRepetitionResults.length),
+      appControllerProvider.select(
+        (s) => s.circularPerRepetitionResults.length,
+      ),
     );
 
     return Scaffold(

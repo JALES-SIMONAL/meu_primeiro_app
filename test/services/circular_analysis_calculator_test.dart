@@ -100,10 +100,7 @@ void main() {
       expect(media.repeticoesValidas, 2);
       expect(media.repeticoesTotais, 3);
       expect(media.distanciaMediaMetros, closeTo(rep.distanciaMetros, 1e-9));
-      expect(
-        media.velocidadeMediaMs,
-        closeTo(rep.velocidadeMediaMs, 1e-9),
-      );
+      expect(media.velocidadeMediaMs, closeTo(rep.velocidadeMediaMs, 1e-9));
       expect(media.rpmMedia, closeTo(rep.rpmMedia, 1e-9));
     });
 
@@ -143,7 +140,10 @@ void main() {
       expect(media!.velocidade, hasLength(1));
       expect(
         media.velocidade.first.value,
-        closeTo((repA.velocidade[0].value + repB.velocidade[0].value) / 2, 1e-9),
+        closeTo(
+          (repA.velocidade[0].value + repB.velocidade[0].value) / 2,
+          1e-9,
+        ),
       );
     });
 

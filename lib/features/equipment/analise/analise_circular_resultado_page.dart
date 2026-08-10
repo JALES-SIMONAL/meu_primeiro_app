@@ -27,10 +27,22 @@ class AnaliseCircularResultadoPage extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
-          _InfoTile('Distancia', '${r.distanciaMediaMetros.toStringAsFixed(3)}m'),
-          _InfoTile('Repeticoes', '${r.repeticoesValidas}/${r.repeticoesTotais}'),
-          _InfoTile('Vel. media', '${r.velocidadeMediaMs.toStringAsFixed(2)}m/s'),
-          _InfoTile('Acel. media', '${r.aceleracaoMediaMs2.toStringAsFixed(2)}m/s2'),
+          _InfoTile(
+            'Distancia',
+            '${r.distanciaMediaMetros.toStringAsFixed(3)}m',
+          ),
+          _InfoTile(
+            'Repeticoes',
+            '${r.repeticoesValidas}/${r.repeticoesTotais}',
+          ),
+          _InfoTile(
+            'Vel. media',
+            '${r.velocidadeMediaMs.toStringAsFixed(2)}m/s',
+          ),
+          _InfoTile(
+            'Acel. media',
+            '${r.aceleracaoMediaMs2.toStringAsFixed(2)}m/s2',
+          ),
           _InfoTile('RPM medio', r.rpmMedia.toStringAsFixed(1)),
           const Divider(height: 24),
           BorderedListTile(
@@ -75,10 +87,7 @@ class _InfoTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         title: Text(label),
-        trailing: Text(
-          value,
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
+        trailing: Text(value, style: Theme.of(context).textTheme.titleMedium),
       ),
     );
   }

@@ -3,11 +3,9 @@ import 'app_log_entry.dart';
 import 'channel_edge_mode.dart';
 import 'channel_live_state.dart';
 import 'circular_analysis_result.dart';
-import 'collection_session.dart';
 import 'device_file.dart';
 import 'esp32_device_state.dart';
 import 'file_data_row.dart';
-import 'sensor_record.dart';
 import '../services/bluetooth_service.dart';
 
 class AppState {
@@ -18,8 +16,6 @@ class AppState {
   final bool bleConnected;
   final bool bleScanning;
   final List<BleDeviceInfo> bleScanResults;
-  final CollectionSession? collectionSession;
-  final Map<String, List<SensorRecord>> recordsByDevice;
   final List<AppLogEntry> logs;
   final String? statusMessage;
 
@@ -52,8 +48,6 @@ class AppState {
     required this.bleConnected,
     required this.bleScanning,
     required this.bleScanResults,
-    required this.collectionSession,
-    required this.recordsByDevice,
     required this.logs,
     required this.statusMessage,
     required this.channelConfigs,
@@ -78,10 +72,6 @@ class AppState {
       bleConnected: false,
       bleScanning: false,
       bleScanResults: const [],
-      collectionSession: null,
-      recordsByDevice: {
-        for (final deviceId in devices.keys) deviceId: <SensorRecord>[],
-      },
       logs: const [],
       statusMessage: null,
       channelConfigs: const [],
@@ -96,17 +86,12 @@ class AppState {
   Esp32DeviceState? get selectedDevice =>
       selectedDeviceId == null ? null : devices[selectedDeviceId];
 
-  List<SensorRecord> recordsFor(String deviceId) =>
-      recordsByDevice[deviceId] ?? const <SensorRecord>[];
-
   AppState copyWith({
     Map<String, Esp32DeviceState>? devices,
     Object? selectedDeviceId = _unset,
     bool? bleConnected,
     bool? bleScanning,
     List<BleDeviceInfo>? bleScanResults,
-    Object? collectionSession = _unset,
-    Map<String, List<SensorRecord>>? recordsByDevice,
     List<AppLogEntry>? logs,
     Object? statusMessage = _unset,
     List<ChannelConfig>? channelConfigs,
@@ -131,10 +116,6 @@ class AppState {
       bleConnected: bleConnected ?? this.bleConnected,
       bleScanning: bleScanning ?? this.bleScanning,
       bleScanResults: bleScanResults ?? this.bleScanResults,
-      collectionSession: collectionSession == _unset
-          ? this.collectionSession
-          : collectionSession as CollectionSession?,
-      recordsByDevice: recordsByDevice ?? this.recordsByDevice,
       logs: logs ?? this.logs,
       statusMessage: statusMessage == _unset
           ? this.statusMessage

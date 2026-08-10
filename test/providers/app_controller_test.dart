@@ -5,8 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meu_primeiro_app/models/analysis_event.dart';
 import 'package:meu_primeiro_app/models/channel_edge_mode.dart';
-import 'package:meu_primeiro_app/models/collection_session.dart';
-import 'package:meu_primeiro_app/models/sensor_state.dart';
 import 'package:meu_primeiro_app/providers/app_controller.dart';
 import 'package:meu_primeiro_app/services/bluetooth_service.dart';
 
@@ -95,17 +93,6 @@ void main() {
     container.dispose();
   });
 
-  test('locks device selection during active collection', () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
-    controller.startCollection(fileName: 'ensaio 01');
-
-    controller.selectDevice('OUTRO_ID');
-
-    expect(controller.state.selectedDeviceId, 'A1B2C3');
-    expect(controller.state.collectionSession?.stage, CollectionStage.running);
-  });
-
   test('startBleScan surfaces discovered devices in state', () async {
     fakeBt.emitScanResults(const [
       BleDeviceInfo(id: 'A1B2C3', name: 'Gerador_UFRN_BT', rssi: -50),
@@ -126,56 +113,36 @@ void main() {
     expect(deviceState!.device.isOnline, isTrue);
   });
 
-  test('connectToDevice sends set_datetime with the current local epoch',
-      () async {
-    // O firmware não tem fuso horário: o epoch enviado usa os campos do
-    // horário local do celular "disfarçados" de UTC (ver
-    // AppController.setDateTime), não o epoch UTC real.
-    int localComoUtcAgora() {
-      final agora = DateTime.now();
-      return DateTime.utc(
-        agora.year,
-        agora.month,
-        agora.day,
-        agora.hour,
-        agora.minute,
-        agora.second,
-      ).millisecondsSinceEpoch ~/
-          1000;
-    }
+  test(
+    'connectToDevice sends set_datetime with the current local epoch',
+    () async {
+      // O firmware não tem fuso horário: o epoch enviado usa os campos do
+      // horário local do celular "disfarçados" de UTC (ver
+      // AppController.setDateTime), não o epoch UTC real.
+      int localComoUtcAgora() {
+        final agora = DateTime.now();
+        return DateTime.utc(
+              agora.year,
+              agora.month,
+              agora.day,
+              agora.hour,
+              agora.minute,
+              agora.second,
+            ).millisecondsSinceEpoch ~/
+            1000;
+      }
 
-    final beforeConnect = localComoUtcAgora();
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
-    final afterConnect = localComoUtcAgora();
+      final beforeConnect = localComoUtcAgora();
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+      final afterConnect = localComoUtcAgora();
 
-    expect(fakeBt.sentCommands, hasLength(1));
-    final sent = fakeBt.sentCommands.single;
-    expect(sent['action'], 'set_datetime');
-    expect(
-      sent['epoch'],
-      inInclusiveRange(beforeConnect, afterConnect),
-    );
-  });
-
-  test('ingests a real firmware event message', () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
-
-    fakeBt.emitLine(
-      jsonEncode({
-        'topico': 'event',
-        'canal': 1,
-        'estado': 'H',
-        'tempo_us': 2000000,
-      }),
-    );
-    await Future<void>.delayed(Duration.zero);
-
-    final deviceState = controller.state.devices['A1B2C3']!;
-    expect(deviceState.channels[1]!.state, SensorState.high);
-    expect(deviceState.channels[1]!.timestampMs, 2000);
-  });
+      expect(fakeBt.sentCommands, hasLength(1));
+      final sent = fakeBt.sentCommands.single;
+      expect(sent['action'], 'set_datetime');
+      expect(sent['epoch'], inInclusiveRange(beforeConnect, afterConnect));
+    },
+  );
 
   test('ingests a firmware state message', () async {
     await controller.connectToDevice('A1B2C3');
@@ -204,22 +171,25 @@ void main() {
     expect(device.sdCardAvailable, isTrue);
   });
 
-  test('reconnecting after an unexpected drop bumps the boot session', () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
+  test(
+    'reconnecting after an unexpected drop bumps the boot session',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
 
-    fakeBt.simulateDrop();
-    await Future<void>.delayed(Duration.zero);
-    expect(controller.state.devices['A1B2C3']!.device.isOnline, isFalse);
+      fakeBt.simulateDrop();
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.devices['A1B2C3']!.device.isOnline, isFalse);
 
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
 
-    final deviceState = controller.state.devices['A1B2C3']!;
-    expect(deviceState.device.isOnline, isTrue);
-    expect(deviceState.rebootCount, 1);
-    expect(deviceState.device.bootSession, 2);
-  });
+      final deviceState = controller.state.devices['A1B2C3']!;
+      expect(deviceState.device.isOnline, isTrue);
+      expect(deviceState.rebootCount, 1);
+      expect(deviceState.device.bootSession, 2);
+    },
+  );
 
   test('sendNext writes the command via the Bluetooth service', () async {
     await controller.connectToDevice('A1B2C3');
@@ -233,34 +203,38 @@ void main() {
     ]);
   });
 
-  test('restartRepetition writes the command via the Bluetooth service',
-      () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
-    fakeBt.sentCommands.clear();
+  test(
+    'restartRepetition writes the command via the Bluetooth service',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+      fakeBt.sentCommands.clear();
 
-    controller.restartRepetition();
+      controller.restartRepetition();
 
-    expect(fakeBt.sentCommands, [
-      {'action': 'restart_repetition'},
-    ]);
-  });
+      expect(fakeBt.sentCommands, [
+        {'action': 'restart_repetition'},
+      ]);
+    },
+  );
 
-  test('startExperiment resends set_datetime before start_experiment',
-      () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
-    fakeBt.sentCommands.clear();
+  test(
+    'startExperiment resends set_datetime before start_experiment',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+      fakeBt.sentCommands.clear();
 
-    controller.startExperiment(3);
+      controller.startExperiment(3);
 
-    expect(fakeBt.sentCommands, hasLength(2));
-    expect(fakeBt.sentCommands[0]['action'], 'set_datetime');
-    expect(fakeBt.sentCommands[1], {
-      'action': 'start_experiment',
-      'repetitions': 3,
-    });
-  });
+      expect(fakeBt.sentCommands, hasLength(2));
+      expect(fakeBt.sentCommands[0]['action'], 'set_datetime');
+      expect(fakeBt.sentCommands[1], {
+        'action': 'start_experiment',
+        'repetitions': 3,
+      });
+    },
+  );
 
   test('ingests a firmware channels message', () async {
     await controller.connectToDevice('A1B2C3');
@@ -456,35 +430,37 @@ void main() {
     expect(media.velocidadeMediaMs, greaterThan(0));
   });
 
-  test('loadCircularGraph exposes the points for the chosen series/repetition',
-      () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
+  test(
+    'loadCircularGraph exposes the points for the chosen series/repetition',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
 
-    final future = controller.runCircularAnalysis(
-      'ENSAIO1.CSV',
-      raioMm: 100,
-      vaosQtd: 4,
-    );
-    fakeBt.emitLine(
-      jsonEncode({
-        'topico': 'analise_eventos',
-        'eventos': [
-          {'canal': 1, 'estado': 'H', 'tempo_us': 0},
-          {'canal': 1, 'estado': 'L', 'tempo_us': 100000},
-          {'canal': 1, 'estado': 'H', 'tempo_us': 200000},
-        ],
-      }),
-    );
-    await Future<void>.delayed(Duration.zero);
-    fakeBt.emitLine(jsonEncode({'topico': 'analise_eventos', 'eventos': []}));
-    await future;
+      final future = controller.runCircularAnalysis(
+        'ENSAIO1.CSV',
+        raioMm: 100,
+        vaosQtd: 4,
+      );
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'analise_eventos',
+          'eventos': [
+            {'canal': 1, 'estado': 'H', 'tempo_us': 0},
+            {'canal': 1, 'estado': 'L', 'tempo_us': 100000},
+            {'canal': 1, 'estado': 'H', 'tempo_us': 200000},
+          ],
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      fakeBt.emitLine(jsonEncode({'topico': 'analise_eventos', 'eventos': []}));
+      await future;
 
-    controller.loadCircularGraph(kind: 'rpm', repeticaoIndice: 0);
+      controller.loadCircularGraph(kind: 'rpm', repeticaoIndice: 0);
 
-    expect(controller.state.circularGraphTitle, 'RPM');
-    expect(controller.state.circularGraphPoints, hasLength(2));
-  });
+      expect(controller.state.circularGraphTitle, 'RPM');
+      expect(controller.state.circularGraphPoints, hasLength(2));
+    },
+  );
 
   test('readFileData sends the command and dados_arquivo populates '
       'fileDataRows (offset 0 replaces, offset>0 appends)', () async {

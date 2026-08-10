@@ -22,8 +22,14 @@ class ConexaoAppPage extends ConsumerWidget {
             title: const Text('Bluetooth'),
             trailing: Text(state.bleConnected ? 'Conectado' : 'Desconectado'),
           ),
-          ListTile(title: const Text('MAC'), trailing: Text(device?.macAddress ?? '-')),
-          ListTile(title: const Text('ID'), trailing: Text(device?.deviceId ?? '-')),
+          ListTile(
+            title: const Text('MAC'),
+            trailing: Text(device?.macAddress ?? '-'),
+          ),
+          ListTile(
+            title: const Text('ID'),
+            trailing: Text(device?.deviceId ?? '-'),
+          ),
           ListTile(
             title: const Text('Nome BLE'),
             trailing: Text(device?.bleDeviceName ?? '-'),
@@ -53,8 +59,9 @@ class ConexaoAppPage extends ConsumerWidget {
                       child: const Text('Cancelar'),
                     ),
                     FilledButton(
-                      onPressed: () =>
-                          Navigator.of(context).pop(controllerTexto.text.trim()),
+                      onPressed: () => Navigator.of(
+                        context,
+                      ).pop(controllerTexto.text.trim()),
                       child: const Text('Salvar'),
                     ),
                   ],

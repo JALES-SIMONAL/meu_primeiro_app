@@ -10,7 +10,11 @@ class ManualPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final url = ref.watch(appControllerProvider).selectedDevice?.device.manualUrl;
+    final url = ref
+        .watch(appControllerProvider)
+        .selectedDevice
+        ?.device
+        .manualUrl;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Manual')),

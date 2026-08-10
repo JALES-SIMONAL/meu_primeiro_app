@@ -3,9 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../providers/app_controller.dart';
 import '../bluetooth/bluetooth_page.dart';
-import '../collection/collection_page.dart';
-import '../devices/devices_page.dart';
-import '../equipment/equipment_menu_page.dart';
+import '../equipment/analise/analise_dados_page.dart';
+import '../equipment/experimentos/experimentos_page.dart';
 import '../settings/settings_page.dart';
 
 class AppShell extends ConsumerStatefulWidget {
@@ -19,23 +18,18 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
 
   static const _tabs = [
-    _ShellTab(title: 'Dispositivos', icon: Icons.devices_rounded),
-    _ShellTab(title: 'Bluetooth', icon: Icons.bluetooth_rounded),
-    _ShellTab(title: 'Equipamento', icon: Icons.tune_rounded),
-    _ShellTab(title: 'Coleta', icon: Icons.storage_rounded),
+    _ShellTab(title: 'Experimentos', icon: Icons.science_outlined),
+    _ShellTab(title: 'Analise de Dados', icon: Icons.query_stats),
     _ShellTab(title: 'Configuracoes', icon: Icons.settings_rounded),
   ];
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(appControllerProvider);
-    final controller = ref.read(appControllerProvider.notifier);
 
     final pages = <Widget>[
-      const DevicesPage(),
-      const BluetoothPage(),
-      const EquipmentMenuPage(),
-      const CollectionPage(),
+      const ExperimentosPage(),
+      const AnaliseDadosPage(),
       const SettingsPage(),
     ];
 
@@ -43,14 +37,19 @@ class _AppShellState extends ConsumerState<AppShell> {
       appBar: AppBar(
         title: Text(_tabs[_index].title),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Center(
-              child: Chip(
-                label: Text(state.bleConnected ? 'Bluetooth' : 'Offline'),
-              ),
+          IconButton(
+            tooltip: state.bleConnected
+                ? 'Bluetooth conectado'
+                : 'Conectar via Bluetooth',
+            icon: Icon(
+              state.bleConnected ? Icons.bluetooth_connected : Icons.bluetooth,
+              color: state.bleConnected ? Colors.lightGreenAccent : null,
             ),
+            onPressed: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const BluetoothPage())),
           ),
+          const SizedBox(width: 4),
         ],
       ),
       body: LayoutBuilder(
@@ -103,13 +102,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           );
         },
       ),
-      floatingActionButton: _index == 1
-          ? FloatingActionButton.extended(
-              onPressed: () => controller.startBleScan(),
-              icon: const Icon(Icons.bluetooth_searching),
-              label: const Text('Escanear Bluetooth'),
-            )
-          : null,
     );
   }
 }

@@ -118,9 +118,7 @@ class CircularAnalysisCalculator {
     final validas = porRepeticao.whereType<CircularCalcResult>().toList();
     if (validas.isEmpty) return null;
 
-    final minPontos = validas
-        .map((r) => r.velocidade.length)
-        .reduce(math.min);
+    final minPontos = validas.map((r) => r.velocidade.length).reduce(math.min);
     if (minPontos == 0) return null;
 
     final somaTempo = List<double>.filled(minPontos, 0);

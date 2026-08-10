@@ -47,10 +47,8 @@ class _AnaliseEventosPageState extends ConsumerState<AnaliseEventosPage> {
                     setState(() => _inicio = null);
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => AnaliseDistanciaPage(
-                          inicio: inicio,
-                          fim: evento,
-                        ),
+                        builder: (_) =>
+                            AnaliseDistanciaPage(inicio: inicio, fim: evento),
                       ),
                     );
                   },

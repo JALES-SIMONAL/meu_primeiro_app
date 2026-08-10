@@ -30,7 +30,10 @@ class _LevelEditPageState extends State<LevelEditPage> {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            Text(_value.round().toString(), style: Theme.of(context).textTheme.displayMedium),
+            Text(
+              _value.round().toString(),
+              style: Theme.of(context).textTheme.displayMedium,
+            ),
             Slider(
               min: 0,
               max: 30,

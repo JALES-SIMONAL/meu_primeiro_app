@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
+import '../../../widgets/ble_required_gate.dart';
 import 'conexao_app_page.dart';
 import 'experimento_execucao_page.dart';
 import 'gerenciamento_arquivos_page.dart';
 import 'teste_canais_page.dart';
 
-/// Equivalente a maquina_estados::Tela::Experimentos.
+/// Equivalente a maquina_estados::Tela::Experimentos. Usada como corpo de
+/// uma das abas principais do AppShell (sem Scaffold/AppBar proprios).
 class ExperimentosPage extends ConsumerWidget {
   const ExperimentosPage({super.key});
 
@@ -16,9 +18,8 @@ class ExperimentosPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(appControllerProvider);
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Experimentos')),
-      body: ListView(
+    return BleRequiredGate(
+      child: ListView(
         padding: const EdgeInsets.all(12),
         children: [
           BorderedListTile(
@@ -35,9 +36,9 @@ class ExperimentosPage extends ConsumerWidget {
             leading: const Icon(Icons.sensors_outlined),
             title: const Text('Teste de canal/sensor'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const TesteCanaisPage()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const TesteCanaisPage())),
           ),
           BorderedListTile(
             leading: const Icon(Icons.folder_outlined),
@@ -53,9 +54,9 @@ class ExperimentosPage extends ConsumerWidget {
             leading: const Icon(Icons.bluetooth_connected),
             title: const Text('Conexao com app'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const ConexaoAppPage()),
-            ),
+            onTap: () => Navigator.of(
+              context,
+            ).push(MaterialPageRoute(builder: (_) => const ConexaoAppPage())),
           ),
         ],
       ),

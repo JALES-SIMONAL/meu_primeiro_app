@@ -26,7 +26,9 @@ class _AnaliseTipoPageState extends ConsumerState<AnaliseTipoPage> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(appControllerProvider.notifier).loadRepetition(widget.arquivo, 0);
+      ref
+          .read(appControllerProvider.notifier)
+          .loadRepetition(widget.arquivo, 0);
     });
   }
 
@@ -40,7 +42,9 @@ class _AnaliseTipoPageState extends ConsumerState<AnaliseTipoPage> {
           BorderedListTile(
             leading: const Icon(Icons.timeline),
             title: const Text('Analise linear'),
-            subtitle: const Text('Velocidade entre dois eventos e uma distancia'),
+            subtitle: const Text(
+              'Velocidade entre dois eventos e uma distancia',
+            ),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const AnaliseEventosPage()),
             ),

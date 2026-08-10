@@ -29,7 +29,11 @@ class BleDeviceInfo {
   final String name;
   final int rssi;
 
-  const BleDeviceInfo({required this.id, required this.name, required this.rssi});
+  const BleDeviceInfo({
+    required this.id,
+    required this.name,
+    required this.rssi,
+  });
 
   bool get isKnownDevice => name.startsWith(BluetoothProtocol.deviceNamePrefix);
 }
@@ -55,7 +59,8 @@ abstract class BluetoothAppService {
 }
 
 class FlutterBlueService implements BluetoothAppService {
-  final _scanResultsController = StreamController<List<BleDeviceInfo>>.broadcast();
+  final _scanResultsController =
+      StreamController<List<BleDeviceInfo>>.broadcast();
   final _connectionController =
       StreamController<BleConnectionStateUi>.broadcast();
   final _linesController = StreamController<String>.broadcast();
@@ -166,7 +171,8 @@ class FlutterBlueService implements BluetoothAppService {
       final services = await device.discoverServices();
       final service = services.firstWhere(
         (s) => s.uuid == BluetoothProtocol.serviceUuid,
-        orElse: () => throw StateError('Servico NUS nao encontrado no dispositivo'),
+        orElse: () =>
+            throw StateError('Servico NUS nao encontrado no dispositivo'),
       );
 
       final txCharacteristic = service.characteristics.firstWhere(
@@ -179,7 +185,9 @@ class FlutterBlueService implements BluetoothAppService {
 
       await txCharacteristic.setNotifyValue(true);
       _notifySubscription?.cancel();
-      _notifySubscription = txCharacteristic.lastValueStream.listen(_onDataReceived);
+      _notifySubscription = txCharacteristic.lastValueStream.listen(
+        _onDataReceived,
+      );
 
       _connected = true;
       _connectionController.add(BleConnectionStateUi.connected);

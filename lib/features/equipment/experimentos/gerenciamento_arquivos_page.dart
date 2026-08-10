@@ -34,7 +34,8 @@ class _GerenciamentoArquivosPageState
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () => ref.read(appControllerProvider.notifier).listFiles(),
+            onPressed: () =>
+                ref.read(appControllerProvider.notifier).listFiles(),
           ),
         ],
       ),
