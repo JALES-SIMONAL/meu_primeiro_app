@@ -38,6 +38,9 @@ dependencies:
   intl: ^0.20.3
   flutter_blue_plus: ^2.3.11
   permission_handler: ^12.0.3
+  share_plus: ^13.3.0
+  cross_file: ^0.3.4+2
+  file_saver: ^0.4.0
 
 dev_dependencies:
   flutter_test:

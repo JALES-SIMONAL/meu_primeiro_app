@@ -47,6 +47,13 @@ class AppController extends Notifier<AppState> {
   final _analiseEventosController =
       StreamController<List<AnalysisEvent>>.broadcast();
 
+  // Alimentado por _handleDadosArquivoMessage — permite que
+  // _aguardarPaginaArquivo() espere a página pedida a "read_file_data" sem
+  // depender/mexer em `state.fileDataRows` (que é da tabela rolante na
+  // tela). Carrega só a página nova (não a lista acumulada).
+  final _dadosArquivoController =
+      StreamController<({List<FileDataRow> linhas, bool temMais})>.broadcast();
+
   // Guarda o último dispositivo conectado: quando a conexão BLE cai, o
   // serviço já pode ter limpo seu próprio estado interno, então o evento de
   // desconexão sozinho não carrega mais o deviceId.
@@ -71,6 +78,7 @@ class AppController extends Notifier<AppState> {
     _bleLinesSubscription?.cancel();
     _bleScanResultsSubscription?.cancel();
     _analiseEventosController.close();
+    _dadosArquivoController.close();
     _bluetoothService.disconnect();
   }
 
@@ -471,10 +479,12 @@ class AppController extends Notifier<AppState> {
         ? novasLinhas
         : (List<FileDataRow>.from(state.fileDataRows)..addAll(novasLinhas));
 
+    final temMais = payload['tem_mais'] == true;
     state = state.copyWith(
       fileDataRows: linhasCompletas,
-      fileDataHasMore: payload['tem_mais'] == true,
+      fileDataHasMore: temMais,
     );
+    _dadosArquivoController.add((linhas: novasLinhas, temMais: temMais));
   }
 
   /// Equivalente a analise_dados::calcularIntervalo +
@@ -729,6 +739,60 @@ class AppController extends Notifier<AppState> {
     'arquivo': arquivo,
     'offset': offset,
   });
+
+  /// Pede a página em "offset" e espera a resposta "dados_arquivo"
+  /// correspondente — mesma premissa de _aguardarRepeticao (uma pergunta em
+  /// voo por vez, sem id de correlação). Página vazia com tem_mais=false de
+  /// volta = fim do arquivo; timeout também encerra (com aviso).
+  Future<({List<FileDataRow> linhas, bool temMais})> _aguardarPaginaArquivo(
+    String arquivo,
+    int offset,
+  ) {
+    final resposta = _dadosArquivoController.stream.first.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        addLog(
+          'Sem resposta do equipamento ao ler $arquivo (offset $offset).',
+          level: AppLogLevel.warning,
+        );
+        return (linhas: const <FileDataRow>[], temMais: false);
+      },
+    );
+    readFileData(arquivo, offset);
+    return resposta;
+  }
+
+  /// Busca o arquivo inteiro via "read_file_data" (paginado) e reconstrói o
+  /// mesmo texto que armazenamento::abrirNovoArquivo()/enfileirarLinha()
+  /// grava no cartão SD do equipamento: cabeçalho "canal,estado,tempo_us",
+  /// linhas "canal,estado,tempo_us" e uma linha em branco entre repetições
+  /// (armazenamento::enfileirarLinhaEmBranco()). Usada para compartilhar ou
+  /// baixar o arquivo — não existe comando BLE que devolva os bytes brutos
+  /// do arquivo, só os dados já interpretados linha a linha. Retorna null se
+  /// o arquivo não tiver nenhuma linha (vazio ou SD indisponível).
+  Future<String?> downloadFileContent(String arquivo) async {
+    final linhas = <FileDataRow>[];
+    var offset = 0;
+    while (true) {
+      final pagina = await _aguardarPaginaArquivo(arquivo, offset);
+      if (pagina.linhas.isEmpty) break;
+      linhas.addAll(pagina.linhas);
+      if (!pagina.temMais) break;
+      offset = linhas.length;
+    }
+    if (linhas.isEmpty) return null;
+
+    final buffer = StringBuffer('canal,estado,tempo_us\n');
+    int? repeticaoAnterior;
+    for (final linha in linhas) {
+      if (repeticaoAnterior != null && linha.repetition != repeticaoAnterior) {
+        buffer.writeln();
+      }
+      buffer.writeln('${linha.channel},${linha.state},${linha.timestampUs}');
+      repeticaoAnterior = linha.repetition;
+    }
+    return buffer.toString();
+  }
 
   void _ensureDevice(String deviceId, {bool online = true}) {
     if (state.devices.containsKey(deviceId)) return;

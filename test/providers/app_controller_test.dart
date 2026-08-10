@@ -508,6 +508,71 @@ void main() {
     expect(controller.state.fileDataHasMore, isFalse);
   });
 
+  test('downloadFileContent pages through read_file_data and rebuilds the '
+      'on-device CSV (header + blank line between repetitions)', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+    fakeBt.sentCommands.clear();
+
+    final future = controller.downloadFileContent('ENSAIO1.CSV');
+
+    expect(fakeBt.sentCommands, [
+      {'action': 'read_file_data', 'arquivo': 'ENSAIO1.CSV', 'offset': 0},
+    ]);
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'dados_arquivo',
+        'arquivo': 'ENSAIO1.CSV',
+        'offset': 0,
+        'linhas': [
+          {'repeticao': 0, 'canal': 1, 'estado': 'H', 'tempo_us': 1000},
+          {'repeticao': 0, 'canal': 1, 'estado': 'L', 'tempo_us': 4000},
+        ],
+        'tem_mais': true,
+      }),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(fakeBt.sentCommands, [
+      {'action': 'read_file_data', 'arquivo': 'ENSAIO1.CSV', 'offset': 0},
+      {'action': 'read_file_data', 'arquivo': 'ENSAIO1.CSV', 'offset': 2},
+    ]);
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'dados_arquivo',
+        'arquivo': 'ENSAIO1.CSV',
+        'offset': 2,
+        'linhas': [
+          {'repeticao': 1, 'canal': 2, 'estado': 'H', 'tempo_us': 8000},
+        ],
+        'tem_mais': false,
+      }),
+    );
+
+    final conteudo = await future;
+
+    expect(
+      conteudo,
+      'canal,estado,tempo_us\n'
+      '1,H,1000\n'
+      '1,L,4000\n'
+      '\n'
+      '2,H,8000\n',
+    );
+  });
+
+  test('downloadFileContent returns null for an empty file', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+
+    final future = controller.downloadFileContent('VAZIO.CSV');
+    fakeBt.emitLine(
+      jsonEncode({'topico': 'dados_arquivo', 'linhas': [], 'tem_mais': false}),
+    );
+
+    expect(await future, isNull);
+  });
+
   test('computeAnalysisResult replicates analise_dados.cpp formula', () {
     const inicio = AnalysisEvent(channel: 1, state: 'H', timestampUs: 1000);
     const fim = AnalysisEvent(channel: 1, state: 'L', timestampUs: 501000);
