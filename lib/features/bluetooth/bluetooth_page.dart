@@ -21,10 +21,34 @@ class BluetoothPage extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            SectionHeader(
-              title: 'Conexao Bluetooth',
-              subtitle:
-                  'Procure e conecte ao equipamento "${BluetoothProtocol.deviceNamePrefix}".',
+            const SectionHeader(title: 'Conexao Bluetooth'),
+            const SizedBox(height: 12),
+            StreamBuilder<bool>(
+              stream: controller.bleAdapterOn,
+              builder: (context, snapshot) {
+                if (snapshot.data == false) {
+                  return Card(
+                    color: const Color(0xFFFFF3E0),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.bluetooth_disabled),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Text('O Bluetooth do aparelho esta desligado.'),
+                          ),
+                          FilledButton(
+                            onPressed: controller.turnOnBluetoothAdapter,
+                            child: const Text('Ativar'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
             ),
             const SizedBox(height: 12),
             Wrap(

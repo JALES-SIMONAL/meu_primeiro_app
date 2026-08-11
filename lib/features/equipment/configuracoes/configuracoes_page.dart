@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
 import '../../../widgets/ble_required_gate.dart';
+import '../../../widgets/senha_dialog.dart';
+import '../experimentos/conexao_app_page.dart';
 import 'config_canais_page.dart';
 import 'manual_page.dart';
 import 'modo_operacao_page.dart';
@@ -16,7 +18,10 @@ class ConfiguracoesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(appControllerProvider);
     final controller = ref.read(appControllerProvider.notifier);
+    final analiseHabilitada =
+        state.selectedDevice?.device.dataAnalysisEnabled ?? true;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Configuracoes')),
@@ -24,6 +29,13 @@ class ConfiguracoesPage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
+            BorderedListTile(
+              leading: const Icon(Icons.bluetooth_connected),
+              title: const Text('Conexao com app'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const ConexaoAppPage()),
+              ),
+            ),
             BorderedListTile(
               leading: const Icon(Icons.settings_input_component),
               title: const Text('Modo de operacao'),
@@ -89,6 +101,31 @@ class ConfiguracoesPage extends ConsumerWidget {
               onTap: () => Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SobrePage())),
+            ),
+            BorderedListTile(
+              leading: const Icon(Icons.query_stats),
+              title: const Text('Analise de dados'),
+              subtitle: Text(analiseHabilitada ? 'Ativada' : 'Desativada'),
+              trailing: Switch(
+                value: analiseHabilitada,
+                onChanged: (novoValor) async {
+                  final ok = await executarComSenha(
+                    context,
+                    ref,
+                    ({senha}) => controller.setDataAnalysisEnabled(
+                      novoValor,
+                      senha: senha,
+                    ),
+                  );
+                  if (!ok && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Nao foi possivel alterar.'),
+                      ),
+                    );
+                  }
+                },
+              ),
             ),
           ],
         ),

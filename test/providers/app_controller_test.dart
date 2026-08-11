@@ -43,6 +43,12 @@ class _FakeBluetoothService implements BluetoothAppService {
   String? get connectedDeviceId => _connectedId;
 
   @override
+  Stream<bool> get adapterOn => Stream.value(true);
+
+  @override
+  Future<void> turnOnAdapter() async {}
+
+  @override
   Future<void> startScan() async {}
 
   @override
@@ -377,17 +383,72 @@ void main() {
     expect(device.bleDeviceName, 'Gerador_UFRN_BT');
   });
 
-  test('setDeviceName sends the set_device_name command', () async {
-    await controller.connectToDevice('A1B2C3');
-    await Future<void>.delayed(Duration.zero);
-    fakeBt.sentCommands.clear();
+  test(
+    'protected actions (setDeviceName/setDataAnalysisEnabled) send the '
+    'password, cache it on success, and reuse the cache without asking '
+    'again on the same connection',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+      fakeBt.sentCommands.clear();
 
-    controller.setDeviceName('Novo_Nome_BT');
+      expect(controller.senhaValidadaNestaConexao, isFalse);
 
-    expect(fakeBt.sentCommands, [
-      {'action': 'set_device_name', 'nome': 'Novo_Nome_BT'},
-    ]);
-  });
+      final futureRename = controller.setDeviceName(
+        'Novo_Nome_BT',
+        senha: 'fisica123',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(fakeBt.sentCommands, [
+        {
+          'action': 'set_device_name',
+          'nome': 'Novo_Nome_BT',
+          'senha': 'fisica123',
+        },
+      ]);
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'resultado_acao_protegida',
+          'acao': 'set_device_name',
+          'ok': true,
+        }),
+      );
+      expect(await futureRename, isTrue);
+      expect(controller.senhaValidadaNestaConexao, isTrue);
+
+      // Segunda ação protegida na MESMA conexão: nao precisa informar senha
+      // de novo, usa o cache.
+      fakeBt.sentCommands.clear();
+      final futureToggle = controller.setDataAnalysisEnabled(false);
+      await Future<void>.delayed(Duration.zero);
+      expect(fakeBt.sentCommands, [
+        {
+          'action': 'set_data_analysis_enabled',
+          'habilitado': false,
+          'senha': 'fisica123',
+        },
+      ]);
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'resultado_acao_protegida',
+          'acao': 'set_data_analysis_enabled',
+          'ok': true,
+        }),
+      );
+      expect(await futureToggle, isTrue);
+
+      // Uma nova conexão zera o cache.
+      fakeBt.simulateDrop();
+      await Future<void>.delayed(Duration.zero);
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.senhaValidadaNestaConexao, isFalse);
+      expect(
+        () => controller.setDeviceName('Outro'),
+        throwsA(isA<StateError>()),
+      );
+    },
+  );
 
   test('ingests a firmware teste_canais message', () async {
     await controller.connectToDevice('A1B2C3');

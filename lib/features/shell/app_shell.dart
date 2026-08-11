@@ -7,6 +7,11 @@ import '../equipment/analise/analise_dados_page.dart';
 import '../equipment/experimentos/experimentos_page.dart';
 import '../settings/settings_page.dart';
 
+/// Indice da aba "Analise de Dados" em _tabs/pages — usado para gatear a
+/// troca de aba por senha quando a analise estiver desativada (ver
+/// Esp32Device.dataAnalysisEnabled/AppController.setDataAnalysisEnabled).
+const int _indiceAbaAnaliseDados = 1;
+
 class AppShell extends ConsumerStatefulWidget {
   const AppShell({super.key});
 
@@ -23,15 +28,44 @@ class _AppShellState extends ConsumerState<AppShell> {
     _ShellTab(title: 'Configuracoes', icon: Icons.settings_rounded),
   ];
 
+  /// "Analise de Dados" só fica acessível de verdade quando habilitada em
+  /// Configuracoes (senha) — tocar na aba desativada NÃO deve ativá-la por
+  /// conta própria, só avisa onde ativar. Isso é intencional (feedback do
+  /// usuário): a única forma de ligar a análise é a troca explícita em
+  /// Configuracoes.
+  void _selecionarAba(int indice) {
+    final analiseHabilitada =
+        ref.read(appControllerProvider).selectedDevice?.device.dataAnalysisEnabled ??
+        true;
+
+    if (indice == _indiceAbaAnaliseDados && !analiseHabilitada) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Analise de dados esta desativada. Ative em Configuracoes.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _index = indice);
+  }
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(appControllerProvider);
+    final analiseHabilitada =
+        state.selectedDevice?.device.dataAnalysisEnabled ?? true;
 
     final pages = <Widget>[
       const ExperimentosPage(),
       const AnaliseDadosPage(),
       const SettingsPage(),
     ];
+
+    Color? corIcone(int indice) =>
+        (indice == _indiceAbaAnaliseDados && !analiseHabilitada) ? Colors.grey : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -65,14 +99,13 @@ class _AppShellState extends ConsumerState<AppShell> {
               children: [
                 NavigationRail(
                   selectedIndex: _index,
-                  onDestinationSelected: (value) =>
-                      setState(() => _index = value),
+                  onDestinationSelected: _selecionarAba,
                   labelType: NavigationRailLabelType.all,
                   leading: const SizedBox(height: 12),
                   destinations: [
-                    for (final tab in _tabs)
+                    for (final (indice, tab) in _tabs.indexed)
                       NavigationRailDestination(
-                        icon: Icon(tab.icon),
+                        icon: Icon(tab.icon, color: corIcone(indice)),
                         label: Text(tab.title),
                       ),
                   ],
@@ -88,12 +121,11 @@ class _AppShellState extends ConsumerState<AppShell> {
               Expanded(child: content),
               NavigationBar(
                 selectedIndex: _index,
-                onDestinationSelected: (value) =>
-                    setState(() => _index = value),
+                onDestinationSelected: _selecionarAba,
                 destinations: [
-                  for (final tab in _tabs)
+                  for (final (indice, tab) in _tabs.indexed)
                     NavigationDestination(
-                      icon: Icon(tab.icon),
+                      icon: Icon(tab.icon, color: corIcone(indice)),
                       label: tab.title,
                     ),
                 ],

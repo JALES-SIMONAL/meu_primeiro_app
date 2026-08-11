@@ -80,6 +80,22 @@ class AppController extends Notifier<AppState> {
   // acumulados). Apagado quando o nome é salvo com sucesso.
   String? _idRascunhoPendente;
 
+  // Alimentado por _handleResultadoAcaoProtegidaMessage — permite que
+  // _executarAcaoProtegida() espere a resposta de "set_device_name"/
+  // "set_data_analysis_enabled"/"set_password" (ações protegidas por senha
+  // — ver configuracoes::validarSenha no firmware).
+  final _resultadoAcaoProtegidaController =
+      StreamController<({String acao, bool ok})>.broadcast();
+
+  // Cache da senha já validada NESTA conexão BLE (zerado a cada nova
+  // conexão em _handleBleConnected — "sessão" pro app é a conexão atual,
+  // ao contrário do firmware, que guarda até reiniciar). Evita pedir a
+  // senha de novo a cada ação protegida na mesma conexão.
+  bool _senhaValidadaNestaConexao = false;
+  String? _senhaCache;
+
+  bool get senhaValidadaNestaConexao => _senhaValidadaNestaConexao;
+
   // Guarda o último dispositivo conectado: quando a conexão BLE cai, o
   // serviço já pode ter limpo seu próprio estado interno, então o evento de
   // desconexão sozinho não carrega mais o deviceId.
@@ -118,6 +134,7 @@ class AppController extends Notifier<AppState> {
     _analiseEventosController.close();
     _dadosArquivoController.close();
     _resultadoNomeMedicaoController.close();
+    _resultadoAcaoProtegidaController.close();
     _bluetoothService.disconnect();
     BleForegroundService.stop();
   }
@@ -147,6 +164,18 @@ class AppController extends Notifier<AppState> {
   void selectDevice(String deviceId) {
     if (!state.devices.containsKey(deviceId)) return;
     state = state.copyWith(selectedDeviceId: deviceId);
+  }
+
+  /// true quando o radio Bluetooth do aparelho esta ligado (sempre true
+  /// fora do Android — ver BluetoothAppService.adapterOn).
+  Stream<bool> get bleAdapterOn => _bluetoothService.adapterOn;
+
+  Future<void> turnOnBluetoothAdapter() async {
+    try {
+      await _bluetoothService.turnOnAdapter();
+    } catch (error) {
+      addLog('Nao foi possivel ligar o Bluetooth: $error', level: AppLogLevel.warning);
+    }
   }
 
   Future<void> startBleScan() async {
@@ -250,6 +279,12 @@ class AppController extends Notifier<AppState> {
   /// à repetição do experimento e reseta a cada repetição, então continua não
   /// servindo como heurística de uptime/reboot.
   void _handleBleConnected(String deviceId) {
+    // "Sessão" da senha é por conexão BLE (ver _senhaValidadaNestaConexao) —
+    // toda conexão nova (inclusive uma reconexão automática) começa
+    // travada de novo, mesmo que o dispositivo continue o mesmo.
+    _senhaValidadaNestaConexao = false;
+    _senhaCache = null;
+
     final existed = state.devices.containsKey(deviceId);
     final wasOnline = state.devices[deviceId]?.device.isOnline ?? false;
     _ensureDevice(deviceId, online: true);
@@ -361,6 +396,9 @@ class AppController extends Notifier<AppState> {
       case 'resultado_nome_medicao':
         _handleResultadoNomeMedicaoMessage(json);
         break;
+      case 'resultado_acao_protegida':
+        _handleResultadoAcaoProtegidaMessage(json);
+        break;
       default:
         break;
     }
@@ -427,6 +465,9 @@ class AppController extends Notifier<AppState> {
       awaitingMeasurementName: payload['aguardando_nome'] == true,
       suggestedMeasurementName:
           payload['nome_sugerido']?.toString() ?? '',
+      dataAnalysisEnabled:
+          payload['analise_dados_habilitada'] as bool? ??
+          deviceState.device.dataAnalysisEnabled,
     );
 
     final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
@@ -631,6 +672,15 @@ class AppController extends Notifier<AppState> {
     _resultadoNomeMedicaoController.add((ok: ok, nomeExiste: nomeExiste));
   }
 
+  /// JSON em resposta a uma ação protegida por senha ("topico":
+  /// "resultado_acao_protegida", bluetooth_app.cpp::publicarResultadoAcaoProtegida).
+  void _handleResultadoAcaoProtegidaMessage(Map<String, dynamic> payload) {
+    final acao = payload['acao']?.toString();
+    final ok = payload['ok'] == true;
+    if (acao == null) return;
+    _resultadoAcaoProtegidaController.add((acao: acao, ok: ok));
+  }
+
   /// Acrescenta liveExperimentEvents (repetição recém-finalizada) ao CSV
   /// acumulado da medição inteira, no mesmo formato de downloadFileContent
   /// (linha em branco SEPARANDO repetições, não uma sobrando no fim). Não
@@ -788,9 +838,86 @@ class AppController extends Notifier<AppState> {
   void reconnectDevice() => _sendCommand({'action': 'reconnect'});
 
   /// Troca o nome anunciado no BLE (persistido no equipamento) — o mesmo
-  /// efeito do "Renomear" na tela física "Conexao com app".
-  void setDeviceName(String nome) =>
-      _sendCommand({'action': 'set_device_name', 'nome': nome});
+  /// efeito do "Renomear" na tela física "Conexao com app". Protegida por
+  /// senha (ver _executarAcaoProtegida) — omitir "senha" só funciona se
+  /// senhaValidadaNestaConexao já for true.
+  Future<bool> setDeviceName(String nome, {String? senha}) {
+    return _executarAcaoProtegida(
+      'set_device_name',
+      (s) => {'action': 'set_device_name', 'nome': nome, 'senha': s},
+      senha: senha,
+    );
+  }
+
+  /// Ativa/desativa a tela "Analise de dados" (menu principal local e aba
+  /// correspondente no app) — mesma senha usada por setDeviceName.
+  Future<bool> setDataAnalysisEnabled(bool habilitado, {String? senha}) {
+    return _executarAcaoProtegida(
+      'set_data_analysis_enabled',
+      (s) => {
+        'action': 'set_data_analysis_enabled',
+        'habilitado': habilitado,
+        'senha': s,
+      },
+      senha: senha,
+    );
+  }
+
+  /// Troca a senha usada por setDeviceName/setDataAnalysisEnabled. Precisa
+  /// da senha ATUAL (não usa o cache — trocar a senha exige confirmar a de
+  /// verdade, mesmo já validada nesta conexão) e da nova (3 a 10
+  /// caracteres, validado pelo firmware).
+  Future<bool> changePassword(String senhaAtual, String novaSenha) {
+    return _executarAcaoProtegida(
+      'set_password',
+      (s) => {'action': 'set_password', 'senha_atual': s, 'nova_senha': novaSenha},
+      senha: senhaAtual,
+      atualizarCache: false,
+    );
+  }
+
+  /// Ponto único das três ações protegidas por senha (ver
+  /// configuracoes::validarSenha no firmware). Usa [senha] se informada
+  /// (e a esconde do cache se a ação falhar); senão cai no cache desta
+  /// conexão — só chamar sem [senha] quando senhaValidadaNestaConexao for
+  /// true. Em caso de sucesso, cacheia a senha usada (a não ser que
+  /// [atualizarCache] seja false, caso de changePassword: a senha ATUAL
+  /// não deve virar cache no lugar da nova).
+  Future<bool> _executarAcaoProtegida(
+    String acao,
+    Map<String, dynamic> Function(String senha) construirComando, {
+    String? senha,
+    bool atualizarCache = true,
+  }) async {
+    final senhaEfetiva = senha ?? _senhaCache;
+    if (senhaEfetiva == null) {
+      throw StateError(
+        'Nenhuma senha informada e nenhuma em cache para "$acao"',
+      );
+    }
+
+    final resposta = _resultadoAcaoProtegidaController.stream
+        .where((r) => r.acao == acao)
+        .first
+        .timeout(
+          const Duration(seconds: 8),
+          onTimeout: () {
+            addLog(
+              'Sem resposta do equipamento para "$acao".',
+              level: AppLogLevel.warning,
+            );
+            return (acao: acao, ok: false);
+          },
+        );
+    _sendCommand(construirComando(senhaEfetiva));
+    final resultado = await resposta;
+
+    if (resultado.ok && atualizarCache) {
+      _senhaValidadaNestaConexao = true;
+      _senhaCache = senhaEfetiva;
+    }
+    return resultado.ok;
+  }
 
   /// Informa a hora atual ao equipamento, que não tem RTC nem noção de fuso
   /// horário próprios (formata o epoch recebido direto como UTC, ver

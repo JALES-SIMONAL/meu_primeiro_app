@@ -34,6 +34,11 @@ class Esp32Device {
   final bool awaitingMeasurementName;
   final String suggestedMeasurementName;
 
+  // true por padrao (mesmo default do firmware) ate a primeira mensagem
+  // "state" chegar — evita esconder "Analise de dados" por um instante
+  // logo apos conectar, antes do primeiro "state".
+  final bool dataAnalysisEnabled;
+
   // Dados estáticos vindos do "topico":"info" (bluetooth_app.cpp::publicarInfoDispositivo),
   // enviados uma única vez logo após conectar (e de novo se o nome BLE mudar).
   final String? author;
@@ -63,6 +68,7 @@ class Esp32Device {
     this.sdTotalKb,
     this.awaitingMeasurementName = false,
     this.suggestedMeasurementName = '',
+    this.dataAnalysisEnabled = true,
     this.author,
     this.manualUrl,
     this.bleDeviceName,
@@ -95,6 +101,7 @@ class Esp32Device {
     int? sdTotalKb,
     bool? awaitingMeasurementName,
     String? suggestedMeasurementName,
+    bool? dataAnalysisEnabled,
     String? author,
     String? manualUrl,
     String? bleDeviceName,
@@ -125,6 +132,7 @@ class Esp32Device {
           awaitingMeasurementName ?? this.awaitingMeasurementName,
       suggestedMeasurementName:
           suggestedMeasurementName ?? this.suggestedMeasurementName,
+      dataAnalysisEnabled: dataAnalysisEnabled ?? this.dataAnalysisEnabled,
       author: author ?? this.author,
       manualUrl: manualUrl ?? this.manualUrl,
       bleDeviceName: bleDeviceName ?? this.bleDeviceName,

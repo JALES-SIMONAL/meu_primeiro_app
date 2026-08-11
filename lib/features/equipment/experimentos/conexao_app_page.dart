@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
+import '../../../widgets/senha_dialog.dart';
 
 /// Equivalente a maquina_estados::Tela::ConexaoApp.
 class ConexaoAppPage extends ConsumerWidget {
@@ -67,8 +68,17 @@ class ConexaoAppPage extends ConsumerWidget {
                   ],
                 ),
               );
-              if (novoNome != null && novoNome.isNotEmpty) {
-                controller.setDeviceName(novoNome);
+              if (novoNome != null && novoNome.isNotEmpty && context.mounted) {
+                final ok = await executarComSenha(
+                  context,
+                  ref,
+                  ({senha}) => controller.setDeviceName(novoNome, senha: senha),
+                );
+                if (!ok && context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Nao foi possivel renomear.')),
+                  );
+                }
               }
             },
           ),
@@ -77,6 +87,79 @@ class ConexaoAppPage extends ConsumerWidget {
             title: const Text('Reconectar'),
             trailing: null,
             onTap: controller.reconnectDevice,
+          ),
+          BorderedListTile(
+            leading: const Icon(Icons.password_outlined),
+            title: const Text('Trocar senha'),
+            subtitle: const Text(
+              'Usada para renomear o BLE e ativar/desativar Analise de dados',
+            ),
+            onTap: () async {
+              final senhaAtualController = TextEditingController();
+              final novaSenhaController = TextEditingController();
+              final confirmar = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Trocar senha'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
+                        controller: senhaAtualController,
+                        obscureText: true,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Senha atual',
+                        ),
+                      ),
+                      TextField(
+                        controller: novaSenhaController,
+                        obscureText: true,
+                        maxLength: 10,
+                        decoration: const InputDecoration(
+                          labelText: 'Nova senha (3 a 10 caracteres)',
+                        ),
+                      ),
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Cancelar'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Confirmar'),
+                    ),
+                  ],
+                ),
+              );
+              if (confirmar != true || !context.mounted) return;
+
+              final novaSenha = novaSenhaController.text;
+              if (novaSenha.length < 3 || novaSenha.length > 10) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('A nova senha deve ter de 3 a 10 caracteres.'),
+                  ),
+                );
+                return;
+              }
+
+              final ok = await controller.changePassword(
+                senhaAtualController.text,
+                novaSenha,
+              );
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(
+                      ok ? 'Senha alterada.' : 'Senha atual incorreta.',
+                    ),
+                  ),
+                );
+              }
+            },
           ),
         ],
       ),

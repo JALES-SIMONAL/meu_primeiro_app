@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
 import '../../../widgets/ble_required_gate.dart';
-import 'conexao_app_page.dart';
 import 'experimento_execucao_page.dart';
 import 'gerenciamento_arquivos_page.dart';
 import 'teste_canais_page.dart';
@@ -49,14 +48,6 @@ class ExperimentosPage extends ConsumerWidget {
                 builder: (_) => const GerenciamentoArquivosPage(),
               ),
             ),
-          ),
-          BorderedListTile(
-            leading: const Icon(Icons.bluetooth_connected),
-            title: const Text('Conexao com app'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => Navigator.of(
-              context,
-            ).push(MaterialPageRoute(builder: (_) => const ConexaoAppPage())),
           ),
         ],
       ),

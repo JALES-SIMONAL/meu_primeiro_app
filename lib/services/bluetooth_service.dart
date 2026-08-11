@@ -51,6 +51,19 @@ abstract class BluetoothAppService {
   bool get isConnected;
   String? get connectedDeviceId;
 
+  /// true quando o radio Bluetooth do aparelho esta ligado. Fora do Android,
+  /// como o app nao consegue ligar o radio sozinho (ver turnOnAdapter),
+  /// assume sempre ligado — a tentativa de escanear/conectar e quem revela
+  /// o erro real nesse caso, tratado pela UI como qualquer outra falha.
+  Stream<bool> get adapterOn;
+
+  /// Pede pro usuario ligar o Bluetooth — s o Android (flutter_blue_plus
+  /// so suporta isso nessa plataforma). Mostra o dialogo nativo do sistema
+  /// pedindo confirmacao; joga FlutterBluePlusException se o usuario
+  /// recusar. Nao faz nada nas outras plataformas (Windows nao tem API
+  /// publica pra isso).
+  Future<void> turnOnAdapter();
+
   Future<void> startScan();
   Future<void> stopScan();
   Future<void> connect(String deviceId);
@@ -94,6 +107,20 @@ class FlutterBlueService implements BluetoothAppService {
 
   @override
   String? get connectedDeviceId => _device?.remoteId.str;
+
+  @override
+  Stream<bool> get adapterOn {
+    if (kIsWeb || !Platform.isAndroid) return Stream.value(true);
+    return FlutterBluePlus.adapterState.map(
+      (s) => s == BluetoothAdapterState.on,
+    );
+  }
+
+  @override
+  Future<void> turnOnAdapter() async {
+    if (kIsWeb || !Platform.isAndroid) return;
+    await FlutterBluePlus.turnOn();
+  }
 
   Future<void> _requestPermissions() async {
     if (kIsWeb || !Platform.isAndroid) return;
