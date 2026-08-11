@@ -960,6 +960,17 @@ class AppController extends Notifier<AppState> {
   /// estava em outra tela/desconectado).
   void getChannels() => _sendCommand({'action': 'get_channels'});
 
+  /// Avisa o firmware que a tela de teste de canais do app foi aberta/
+  /// fechada — sem isto, os NeoPixels físicos só acendiam quando o teste
+  /// era feito localmente pelo encoder (o app já recebia os níveis via
+  /// "teste_canais", mas nada no firmware acionava os LEDs por conta de um
+  /// teste iniciado só pelo app). Chamar com false ao sair da tela é
+  /// importante: sem isso os LEDs ficariam acesos indefinidamente (o
+  /// firmware também zera sozinho ao detectar a desconexão BLE, mas não há
+  /// como saber que o usuário só navegou pra outra tela do app).
+  void setChannelTestActive(bool ativo) =>
+      _sendCommand({'action': 'set_channel_test_active', 'ativo': ativo});
+
   void listFiles() => _sendCommand({'action': 'list_files'});
 
   void renameFile(String from, String to) =>
