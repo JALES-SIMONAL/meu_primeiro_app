@@ -1,12 +1,15 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:meu_primeiro_app/models/analysis_event.dart';
 import 'package:meu_primeiro_app/models/channel_edge_mode.dart';
+import 'package:meu_primeiro_app/models/local_measurement_draft.dart';
 import 'package:meu_primeiro_app/providers/app_controller.dart';
 import 'package:meu_primeiro_app/services/bluetooth_service.dart';
+import 'package:meu_primeiro_app/services/local_draft_store.dart';
 
 class _FakeBluetoothService implements BluetoothAppService {
   final _scanResultsController =
@@ -18,6 +21,7 @@ class _FakeBluetoothService implements BluetoothAppService {
   bool _connected = false;
   String? _connectedId;
   final List<Map<String, dynamic>> sentCommands = [];
+  int connectCallCount = 0;
 
   @override
   Stream<List<BleDeviceInfo>> get scanResults => _scanResultsController.stream;
@@ -46,6 +50,7 @@ class _FakeBluetoothService implements BluetoothAppService {
 
   @override
   Future<void> connect(String deviceId) async {
+    connectCallCount++;
     _connectedId = deviceId;
     _connected = true;
     _connectionController.add(BleConnectionStateUi.connected);
@@ -72,17 +77,59 @@ class _FakeBluetoothService implements BluetoothAppService {
   }
 }
 
+class _FakeLocalDraftStore extends LocalDraftStore {
+  final Map<String, LocalMeasurementDraft> _metadados = {};
+  final Map<String, String> _conteudos = {};
+  int _proximoId = 0;
+
+  @override
+  Future<LocalMeasurementDraft> salvar({
+    required String suggestedName,
+    required String csvContent,
+    String? deviceLabel,
+  }) async {
+    final id = 'draft-${_proximoId++}';
+    final draft = LocalMeasurementDraft(
+      id: id,
+      suggestedName: suggestedName,
+      createdAt: DateTime.now(),
+      deviceLabel: deviceLabel,
+    );
+    _metadados[id] = draft;
+    _conteudos[id] = csvContent;
+    return draft;
+  }
+
+  @override
+  Future<List<LocalMeasurementDraft>> listar() async =>
+      _metadados.values.toList();
+
+  @override
+  Future<String?> lerConteudo(String id) async => _conteudos[id];
+
+  @override
+  Future<void> excluir(String id) async {
+    _metadados.remove(id);
+    _conteudos.remove(id);
+  }
+}
+
 void main() {
   late ProviderContainer container;
   late AppController controller;
   late _FakeBluetoothService fakeBt;
+  late _FakeLocalDraftStore fakeDrafts;
 
   setUp(() {
     fakeBt = _FakeBluetoothService();
+    fakeDrafts = _FakeLocalDraftStore();
     container = ProviderContainer(
       overrides: [
         appControllerProvider.overrideWith(
-          () => AppController(bluetoothService: fakeBt),
+          () => AppController(
+            bluetoothService: fakeBt,
+            localDraftStore: fakeDrafts,
+          ),
         ),
       ],
     );
@@ -188,6 +235,54 @@ void main() {
       expect(deviceState.device.isOnline, isTrue);
       expect(deviceState.rebootCount, 1);
       expect(deviceState.device.bootSession, 2);
+    },
+  );
+
+  test(
+    'an unexpected drop triggers an automatic reconnect attempt, but a '
+    'user-initiated disconnect does not',
+    () {
+      // Timer(...) só é interceptado pelo relógio falso do fakeAsync quando
+      // criado dentro da zona dele — por isso o container/controller desse
+      // teste (que registram o listener de connectionStateChanges, de onde
+      // o Timer de reconexão nasce) precisam ser montados aqui dentro, e não
+      // reaproveitar os do setUp().
+      fakeAsync((async) {
+        final localFakeBt = _FakeBluetoothService();
+        final localContainer = ProviderContainer(
+          overrides: [
+            appControllerProvider.overrideWith(
+              () => AppController(bluetoothService: localFakeBt),
+            ),
+          ],
+        );
+        addTearDown(localContainer.dispose);
+        final localController = localContainer.read(
+          appControllerProvider.notifier,
+        );
+
+        localController.connectToDevice('A1B2C3');
+        async.flushMicrotasks();
+        expect(localController.state.bleConnected, isTrue);
+
+        localFakeBt.simulateDrop();
+        async.flushMicrotasks();
+        expect(localController.state.bleConnected, isFalse);
+        expect(localFakeBt.connectCallCount, 1);
+
+        async.elapse(const Duration(seconds: 5));
+        expect(localFakeBt.connectCallCount, 2);
+        expect(localController.state.bleConnected, isTrue);
+
+        localController.disconnectBluetooth();
+        async.flushMicrotasks();
+        expect(localController.state.bleConnected, isFalse);
+
+        // Sem reconexao automatica apos uma desconexao pedida pelo usuario.
+        async.elapse(const Duration(seconds: 30));
+        expect(localFakeBt.connectCallCount, 2);
+        expect(localController.state.bleConnected, isFalse);
+      });
     },
   );
 
@@ -335,11 +430,13 @@ void main() {
     controller.listFiles();
     controller.renameFile('OLD.CSV', 'novo');
     controller.deleteFile('OUTRO.CSV');
+    controller.deleteAllFiles();
 
     expect(fakeBt.sentCommands, [
       {'action': 'list_files'},
       {'action': 'rename_file', 'from': 'OLD.CSV', 'to': 'novo'},
       {'action': 'delete_file', 'nome': 'OUTRO.CSV'},
+      {'action': 'delete_all_files'},
     ]);
 
     fakeBt.emitLine(
@@ -381,6 +478,80 @@ void main() {
 
     expect(controller.state.loadedAnalysisEvents, hasLength(2));
   });
+
+  test('"event" messages accumulate into liveExperimentEvents in real time', () async {
+    await controller.connectToDevice('A1B2C3');
+    await Future<void>.delayed(Duration.zero);
+
+    fakeBt.emitLine(
+      jsonEncode({'topico': 'event', 'canal': 1, 'estado': 'H', 'tempo_us': 0}),
+    );
+    await Future<void>.delayed(Duration.zero);
+    fakeBt.emitLine(
+      jsonEncode({
+        'topico': 'event',
+        'canal': 1,
+        'estado': 'L',
+        'tempo_us': 250000,
+      }),
+    );
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state.liveExperimentEvents, hasLength(2));
+    expect(controller.state.liveExperimentEvents[1].timestampUs, 250000);
+  });
+
+  test(
+    'liveExperimentEvents is cleared on startExperiment/restartRepetition '
+    'and when the firmware advances to the next repetition',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+
+      fakeBt.emitLine(
+        jsonEncode({'topico': 'event', 'canal': 1, 'estado': 'H', 'tempo_us': 0}),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.liveExperimentEvents, hasLength(1));
+
+      controller.restartRepetition();
+      expect(controller.state.liveExperimentEvents, isEmpty);
+
+      fakeBt.emitLine(
+        jsonEncode({'topico': 'event', 'canal': 1, 'estado': 'H', 'tempo_us': 0}),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.liveExperimentEvents, hasLength(1));
+
+      // Firmware avança repeticao_atual sozinho ao terminar a repetição.
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'state',
+          'modo_operacao': 'app',
+          'brilho': 20,
+          'volume': 15,
+          'sd_disponivel': true,
+          'sd_erros': 0,
+          'experimento_ativo': true,
+          'repeticao_atual': 1,
+          'repeticoes_totais': 3,
+          'eventos_repeticao': 0,
+          'num_canais': 6,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.liveExperimentEvents, isEmpty);
+
+      fakeBt.emitLine(
+        jsonEncode({'topico': 'event', 'canal': 1, 'estado': 'H', 'tempo_us': 0}),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.liveExperimentEvents, hasLength(1));
+
+      controller.startExperiment(3);
+      expect(controller.state.liveExperimentEvents, isEmpty);
+    },
+  );
 
   test('runCircularAnalysis loops load_repetition until an empty response '
       'and aggregates the results', () async {
@@ -582,4 +753,146 @@ void main() {
     expect(resultado.deltaTUs, 500000);
     expect(resultado.velocidadeMs, closeTo(2.0, 0.0001));
   });
+
+  test(
+    'a measurement finishing while awaiting a name is captured as a local '
+    'draft from live events, and saving the name deletes the draft',
+    () async {
+      await controller.connectToDevice('A1B2C3');
+      await Future<void>.delayed(Duration.zero);
+
+      controller.startExperiment(2);
+      await Future<void>.delayed(Duration.zero);
+
+      // Repetição 1: dois eventos ao vivo.
+      fakeBt.emitLine(
+        jsonEncode({'topico': 'event', 'canal': 1, 'estado': 'H', 'tempo_us': 0}),
+      );
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'event',
+          'canal': 1,
+          'estado': 'L',
+          'tempo_us': 500,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      // Firmware avança pra repetição 2 — comita a repetição 1 no buffer da
+      // medição e limpa liveExperimentEvents.
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'state',
+          'modo_operacao': 'app',
+          'brilho': 20,
+          'volume': 15,
+          'sd_disponivel': true,
+          'sd_erros': 0,
+          'experimento_ativo': true,
+          'repeticao_atual': 2,
+          'repeticoes_totais': 2,
+          'eventos_repeticao': 0,
+          'num_canais': 6,
+          'aguardando_nome': false,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(controller.state.liveExperimentEvents, isEmpty);
+
+      // Repetição 2 (última): um evento ao vivo.
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'event',
+          'canal': 2,
+          'estado': 'H',
+          'tempo_us': 0,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      // Última repetição termina: aguardando_nome vira true.
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'state',
+          'modo_operacao': 'app',
+          'brilho': 20,
+          'volume': 15,
+          'sd_disponivel': true,
+          'sd_erros': 0,
+          'experimento_ativo': false,
+          'repeticao_atual': 2,
+          'repeticoes_totais': 2,
+          'eventos_repeticao': 0,
+          'num_canais': 6,
+          'aguardando_nome': true,
+          'nome_sugerido': '10-08-2026_10-00',
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+      await Future<void>.delayed(Duration.zero);
+
+      final device = controller.state.devices['A1B2C3']!.device;
+      expect(device.awaitingMeasurementName, isTrue);
+      expect(device.suggestedMeasurementName, '10-08-2026_10-00');
+
+      final rascunhos = await controller.listLocalDrafts();
+      expect(rascunhos, hasLength(1));
+      expect(rascunhos.single.suggestedName, '10-08-2026_10-00');
+
+      final conteudo = await controller.readLocalDraftContent(
+        rascunhos.single.id,
+      );
+      expect(conteudo, 'canal,estado,tempo_us\n1,H,0\n1,L,500\n\n2,H,0\n');
+
+      // Salva o nome — resposta "resultado_nome_medicao" chega antes do
+      // "state" que confirma aguardando_nome:false, mas o rascunho só é
+      // removido quando o AppController vê aguardando_nome virar false.
+      fakeBt.sentCommands.clear();
+      final futureResultado = controller.saveMeasurementName(
+        '10-08-2026_10-00',
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(fakeBt.sentCommands, [
+        {
+          'action': 'save_measurement_name',
+          'nome': '10-08-2026_10-00',
+          'sobrescrever': false,
+        },
+      ]);
+
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'resultado_nome_medicao',
+          'ok': true,
+          'nome_existe': false,
+        }),
+      );
+      final resultado = await futureResultado;
+      expect(resultado.ok, isTrue);
+
+      fakeBt.emitLine(
+        jsonEncode({
+          'topico': 'state',
+          'modo_operacao': 'app',
+          'brilho': 20,
+          'volume': 15,
+          'sd_disponivel': true,
+          'sd_erros': 0,
+          'experimento_ativo': false,
+          'repeticao_atual': 2,
+          'repeticoes_totais': 2,
+          'eventos_repeticao': 0,
+          'num_canais': 6,
+          'aguardando_nome': false,
+        }),
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      expect(
+        controller.state.devices['A1B2C3']!.device.awaitingMeasurementName,
+        isFalse,
+      );
+      expect(await controller.listLocalDrafts(), isEmpty);
+    },
+  );
 }

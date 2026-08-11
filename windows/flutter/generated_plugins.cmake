@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   file_saver
+  file_selector_windows
   flutter_blue_plus_winrt
   permission_handler_windows
   share_plus

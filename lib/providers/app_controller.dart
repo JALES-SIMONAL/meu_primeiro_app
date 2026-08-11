@@ -13,8 +13,11 @@ import '../models/device_file.dart';
 import '../models/esp32_device.dart';
 import '../models/esp32_device_state.dart';
 import '../models/file_data_row.dart';
+import '../models/local_measurement_draft.dart';
+import '../services/ble_foreground_service.dart';
 import '../services/bluetooth_service.dart';
 import '../services/circular_analysis_calculator.dart';
+import '../services/local_draft_store.dart';
 
 /// Mesmo teto de experimentos::iniciar() / MAX_REPETICOES no firmware — limite
 /// de segurança para o loop que descobre quantas repetições um arquivo tem
@@ -29,12 +32,15 @@ class AppController extends Notifier<AppState> {
   AppController({
     BluetoothAppService? bluetoothService,
     CircularAnalysisCalculator? circularCalculator,
+    LocalDraftStore? localDraftStore,
   }) : _bluetoothService = bluetoothService ?? FlutterBlueService(),
        _circularCalculator =
-           circularCalculator ?? const CircularAnalysisCalculator();
+           circularCalculator ?? const CircularAnalysisCalculator(),
+       _localDraftStore = localDraftStore ?? const LocalDraftStore();
 
   final BluetoothAppService _bluetoothService;
   final CircularAnalysisCalculator _circularCalculator;
+  final LocalDraftStore _localDraftStore;
 
   StreamSubscription<BleConnectionStateUi>? _bleConnectionSubscription;
   StreamSubscription<String>? _bleLinesSubscription;
@@ -54,10 +60,41 @@ class AppController extends Notifier<AppState> {
   final _dadosArquivoController =
       StreamController<({List<FileDataRow> linhas, bool temMais})>.broadcast();
 
+  // Alimentado por _handleResultadoNomeMedicaoMessage — permite que
+  // saveMeasurementName() espere a resposta de "save_measurement_name".
+  final _resultadoNomeMedicaoController =
+      StreamController<({bool ok, bool nomeExiste})>.broadcast();
+
+  // Acumula o CSV da medição inteira (todas as repetições já finalizadas,
+  // no mesmo formato reconstruído por downloadFileContent) a partir dos
+  // eventos ao vivo — rede de segurança para salvar um rascunho local (ver
+  // LocalDraftStore) se a medição terminar sem conexão pra nomear/salvar no
+  // equipamento. Zerado a cada novo experimento; cada repetição finalizada
+  // é "commitada" aqui a partir de liveExperimentEvents antes dele ser
+  // limpo (ver _commitarRepeticaoAtual).
+  final StringBuffer _medicaoCsvBuffer = StringBuffer();
+
+  // Id do rascunho local criado para a medição ATUALMENTE aguardando nome
+  // no equipamento (null se nenhum rascunho foi necessário — ex.: o app só
+  // reconectou depois da medição já ter terminado, sem eventos ao vivo
+  // acumulados). Apagado quando o nome é salvo com sucesso.
+  String? _idRascunhoPendente;
+
   // Guarda o último dispositivo conectado: quando a conexão BLE cai, o
   // serviço já pode ter limpo seu próprio estado interno, então o evento de
   // desconexão sozinho não carrega mais o deviceId.
   String? _lastDeviceId;
+
+  // Controla a reconexao automatica: uma queda inesperada de conexao (fora
+  // do alcance, firmware reiniciou, interferencia) deve levar o app a tentar
+  // reconectar sozinho, sem exigir que o usuario va em Bluetooth > Conectar
+  // de novo. So NAO tenta quando o proprio usuario pediu a desconexao (botao
+  // "Desconectar"). O firmware tem sua propria logica de voltar a anunciar
+  // apos perder a conexao (bluetooth_app.cpp) — isso aqui cobre soh o lado
+  // do app.
+  Timer? _reconnectTimer;
+  bool _userInitiatedDisconnect = false;
+  static const _reconnectDelay = Duration(seconds: 5);
 
   @override
   AppState build() {
@@ -74,12 +111,15 @@ class AppController extends Notifier<AppState> {
   }
 
   void shutdown() {
+    _reconnectTimer?.cancel();
     _bleConnectionSubscription?.cancel();
     _bleLinesSubscription?.cancel();
     _bleScanResultsSubscription?.cancel();
     _analiseEventosController.close();
     _dadosArquivoController.close();
+    _resultadoNomeMedicaoController.close();
     _bluetoothService.disconnect();
+    BleForegroundService.stop();
   }
 
   static Map<String, Esp32DeviceState> _buildInitialDevices() => {};
@@ -127,6 +167,8 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> connectToDevice(String deviceId) async {
+    _userInitiatedDisconnect = false;
+    _reconnectTimer?.cancel();
     await stopBleScan();
     try {
       await _bluetoothService.connect(deviceId);
@@ -141,8 +183,34 @@ class AppController extends Notifier<AppState> {
   }
 
   Future<void> disconnectBluetooth() async {
+    _userInitiatedDisconnect = true;
+    _reconnectTimer?.cancel();
     await _bluetoothService.disconnect();
+    await BleForegroundService.stop();
     addLog('Bluetooth desconectado.', level: AppLogLevel.info);
+  }
+
+  /// Agenda uma nova tentativa de conexao ao ultimo dispositivo apos uma
+  /// queda inesperada. Reagendado pelo proprio _handleConnectionStateChange
+  /// enquanto a tentativa continuar falhando, ate reconectar ou o usuario
+  /// desconectar manualmente.
+  void _scheduleReconnect(String deviceId) {
+    _reconnectTimer?.cancel();
+    _reconnectTimer = Timer(_reconnectDelay, () => _attemptReconnect(deviceId));
+  }
+
+  Future<void> _attemptReconnect(String deviceId) async {
+    if (_userInitiatedDisconnect || state.bleConnected) return;
+    addLog(
+      'Tentando reconectar Bluetooth a ${_knownDeviceNames[deviceId] ?? deviceId}...',
+      level: AppLogLevel.info,
+    );
+    try {
+      await _bluetoothService.connect(deviceId);
+    } catch (_) {
+      // connectionStateChanges emite "disconnected" nesse caso, o que
+      // reagenda a proxima tentativa via _handleConnectionStateChange.
+    }
   }
 
   void _handleScanResults(List<BleDeviceInfo> results) {
@@ -166,6 +234,9 @@ class AppController extends Notifier<AppState> {
         state = state.copyWith(bleConnected: false);
         final deviceId = _lastDeviceId;
         if (deviceId != null) _handleBleDisconnected(deviceId);
+        if (deviceId != null && !_userInitiatedDisconnect) {
+          _scheduleReconnect(deviceId);
+        }
         break;
       case BleConnectionStateUi.connecting:
       case BleConnectionStateUi.disconnecting:
@@ -209,6 +280,15 @@ class AppController extends Notifier<AppState> {
     state = state.copyWith(devices: updatedDevices);
     selectDevice(deviceId);
     setDateTime();
+
+    // Sem efeito fora do Android (ver BleForegroundService) — mantem o app
+    // vivo em segundo plano enquanto durar esta conexao, inclusive apos uma
+    // reconexao automatica (_scheduleReconnect/_attemptReconnect chegam
+    // aqui pelo mesmo caminho).
+    BleForegroundService.start(
+      _knownDeviceNames[deviceId] ?? deviceId,
+      onError: (mensagem) => addLog(mensagem, level: AppLogLevel.warning),
+    );
   }
 
   void _handleBleDisconnected(String deviceId) {
@@ -272,8 +352,14 @@ class AppController extends Notifier<AppState> {
       case 'analise_eventos':
         _handleAnaliseEventosMessage(json);
         break;
+      case 'event':
+        _handleEventoAoVivoMessage(json);
+        break;
       case 'dados_arquivo':
         _handleDadosArquivoMessage(json);
+        break;
+      case 'resultado_nome_medicao':
+        _handleResultadoNomeMedicaoMessage(json);
         break;
       default:
         break;
@@ -289,6 +375,19 @@ class AppController extends Notifier<AppState> {
 
     final channelCount = _asInt(payload['num_canais']);
     final modoOperacao = payload['modo_operacao'];
+
+    // O firmware avança repeticao_atual sozinho ao terminar uma repetição e
+    // iniciar a próxima (sem esperar um comando do app) — some se perder
+    // esse aviso e não zerar aqui, os eventos ao vivo da repetição anterior
+    // ficariam misturados com os da nova na tela de execução. Antes de
+    // limpar, commita a repetição recém-finalizada no buffer da medição
+    // inteira (ver _commitarRepeticaoAtual/_medicaoCsvBuffer).
+    final novaRepeticao = _asInt(payload['repeticao_atual']);
+    if (novaRepeticao != null &&
+        novaRepeticao != deviceState.device.repetitionCurrent) {
+      _commitarRepeticaoAtual();
+      state = state.copyWith(liveExperimentEvents: const []);
+    }
 
     final device = deviceState.device.copyWith(
       isOnline: true,
@@ -322,11 +421,70 @@ class AppController extends Notifier<AppState> {
           deviceState.device.experimentElapsedSeconds,
       sdUsedKb: _asInt(payload['sd_usado_kb']) ?? deviceState.device.sdUsedKb,
       sdTotalKb: _asInt(payload['sd_total_kb']) ?? deviceState.device.sdTotalKb,
+      // Sempre explícito (nunca "?? valor anterior"): precisa voltar para
+      // false/vazio assim que o firmware parar de mandar aguardando_nome
+      // (medição salva ou nenhuma medição pendente), não só quando true.
+      awaitingMeasurementName: payload['aguardando_nome'] == true,
+      suggestedMeasurementName:
+          payload['nome_sugerido']?.toString() ?? '',
     );
 
     final updatedDevices = Map<String, Esp32DeviceState>.from(state.devices)
       ..[deviceId] = deviceState.copyWith(device: device);
     state = state.copyWith(devices: updatedDevices);
+
+    final estavaAguardandoNome = deviceState.device.awaitingMeasurementName;
+    if (!estavaAguardandoNome && device.awaitingMeasurementName) {
+      // Medição acabou de terminar (última repetição): commita o que
+      // sobrou em liveExperimentEvents (ainda não passou pelo commit de
+      // troca de repetição, já que não há uma "próxima" depois da última)
+      // e tenta guardar um rascunho local — vira no-op se o buffer estiver
+      // vazio (ver _persistirRascunhoLocal), ex.: medição que já estava
+      // pendente antes desta conexão, sem eventos capturados ao vivo aqui.
+      _commitarRepeticaoAtual();
+      state = state.copyWith(liveExperimentEvents: const []);
+      unawaited(
+        _persistirRascunhoLocal(deviceId, device.suggestedMeasurementName),
+      );
+    } else if (estavaAguardandoNome && !device.awaitingMeasurementName) {
+      // Resolvida (nomeada/salva) — pelo app (saveMeasurementName) ou pelo
+      // menu físico do equipamento, tanto faz: o rascunho local, se existir,
+      // não é mais necessário.
+      final id = _idRascunhoPendente;
+      _idRascunhoPendente = null;
+      _medicaoCsvBuffer.clear();
+      if (id != null) unawaited(_localDraftStore.excluir(id));
+    }
+  }
+
+  /// Chamada ao detectar que uma medição acabou de entrar em "aguardando
+  /// nome" (ver _handleStateMessage). Só cria o rascunho se houver algo
+  /// acumulado localmente — não faz sentido gravar um rascunho vazio (ex.:
+  /// o app só reconectou depois da medição já ter terminado, sem receber
+  /// nenhum evento ao vivo dela).
+  Future<void> _persistirRascunhoLocal(
+    String deviceId,
+    String nomeSugerido,
+  ) async {
+    if (_medicaoCsvBuffer.isEmpty) return;
+    final conteudo = 'canal,estado,tempo_us\n${_medicaoCsvBuffer.toString()}';
+    _medicaoCsvBuffer.clear();
+
+    try {
+      final draft = await _localDraftStore.salvar(
+        suggestedName: nomeSugerido,
+        csvContent: conteudo,
+        deviceLabel: _knownDeviceNames[deviceId] ?? deviceId,
+      );
+      _idRascunhoPendente = draft.id;
+      addLog(
+        'Medicao "$nomeSugerido" finalizada e salva como rascunho local '
+        '(ainda nao nomeada no equipamento).',
+        level: AppLogLevel.info,
+      );
+    } catch (error) {
+      addLog('Falha ao salvar rascunho local: $error', level: AppLogLevel.warning);
+    }
   }
 
   /// JSON publicado com a config de canais ("topico":"channels",
@@ -443,6 +601,51 @@ class AppController extends Notifier<AppState> {
     }
   }
 
+  /// JSON publicado em tempo real a cada evento válido durante um
+  /// experimento ativo ("topico":"event", bluetooth_app.cpp::publicarEvento
+  /// <- experimentos::aoReceberEventoValido), já com tempo_us relativo ao
+  /// primeiro evento da repetição. Acumulado em liveExperimentEvents, que a
+  /// tela de execução do experimento mostra ao vivo — distinto de
+  /// loadedAnalysisEvents (repetição já salva, carregada sob demanda).
+  void _handleEventoAoVivoMessage(Map<String, dynamic> payload) {
+    final canal = _asInt(payload['canal']);
+    final estado = payload['estado']?.toString();
+    final tempoUs = _asInt(payload['tempo_us']);
+    if (canal == null || estado == null || tempoUs == null) return;
+
+    final evento = AnalysisEvent(
+      channel: canal,
+      state: estado,
+      timestampUs: tempoUs,
+    );
+    state = state.copyWith(
+      liveExperimentEvents: [...state.liveExperimentEvents, evento],
+    );
+  }
+
+  /// JSON em resposta a "save_measurement_name" ("topico":
+  /// "resultado_nome_medicao", bluetooth_app.cpp::publicarResultadoNomeMedicao).
+  void _handleResultadoNomeMedicaoMessage(Map<String, dynamic> payload) {
+    final ok = payload['ok'] == true;
+    final nomeExiste = payload['nome_existe'] == true;
+    _resultadoNomeMedicaoController.add((ok: ok, nomeExiste: nomeExiste));
+  }
+
+  /// Acrescenta liveExperimentEvents (repetição recém-finalizada) ao CSV
+  /// acumulado da medição inteira, no mesmo formato de downloadFileContent
+  /// (linha em branco SEPARANDO repetições, não uma sobrando no fim). Não
+  /// mexe em liveExperimentEvents — quem chama decide se/quando limpar.
+  void _commitarRepeticaoAtual() {
+    final eventos = state.liveExperimentEvents;
+    if (eventos.isEmpty) return;
+    if (_medicaoCsvBuffer.isNotEmpty) _medicaoCsvBuffer.writeln();
+    for (final evento in eventos) {
+      _medicaoCsvBuffer.writeln(
+        '${evento.channel},${evento.state},${evento.timestampUs}',
+      );
+    }
+  }
+
   /// JSON sob demanda ("topico":"dados_arquivo",
   /// bluetooth_app.cpp::publicarDadosArquivo) — uma página da tabela rolante
   /// de dados do arquivo. offset==0 é sempre o início de uma nova consulta
@@ -552,20 +755,35 @@ class AppController extends Notifier<AppState> {
     // Reenvia a hora antes de iniciar: se o "set_datetime" da conexao (ver
     // _handleBleConnected) tiver se perdido (write BLE sem confirmacao), o
     // nome do arquivo cairia no fallback "MEDICAOn" em vez de "Tddmmaaaa_hhmm"
-    // (ver tempo.cpp/maquina_estados::gerarNomeSugerido no firmware).
+    // (ver tempo.cpp/experimentos::gerarNomeSugerido no firmware).
     setDateTime();
+    state = state.copyWith(liveExperimentEvents: const []);
+    _medicaoCsvBuffer.clear();
+    _idRascunhoPendente = null;
     _sendCommand({'action': 'start_experiment', 'repetitions': repetitions});
   }
 
   void stopExperiment() => _sendCommand({'action': 'stop_experiment'});
-  void cancelExperiment() => _sendCommand({'action': 'cancel_experiment'});
+
+  void cancelExperiment() {
+    state = state.copyWith(liveExperimentEvents: const []);
+    _medicaoCsvBuffer.clear();
+    _idRascunhoPendente = null;
+    _sendCommand({'action': 'cancel_experiment'});
+  }
+
   void finishRepetition() => _sendCommand({'action': 'finish_repetition'});
 
   /// Descarta os eventos ja coletados na repeticao atual e a reinicia do
   /// zero, sem sair do experimento (equivalente ao "Reiniciar repeticao" da
   /// tela fisica — maquina_estados::confirmarReiniciarRepeticaoSim /
-  /// CommandType::RestartRepetition).
-  void restartRepetition() => _sendCommand({'action': 'restart_repetition'});
+  /// CommandType::RestartRepetition). Zera liveExperimentEvents otimisticamente
+  /// (sem esperar confirmacao do equipamento) — o firmware nao manda um
+  /// evento dedicado avisando que descartou o buffer da repeticao.
+  void restartRepetition() {
+    state = state.copyWith(liveExperimentEvents: const []);
+    _sendCommand({'action': 'restart_repetition'});
+  }
 
   void reconnectDevice() => _sendCommand({'action': 'reconnect'});
 
@@ -622,6 +840,51 @@ class AppController extends Notifier<AppState> {
 
   void deleteFile(String nome) =>
       _sendCommand({'action': 'delete_file', 'nome': nome});
+
+  /// Exclui todos os ".csv" do cartão (equivalente ao "Excluir todos" da
+  /// tela física — maquina_estados::confirmarExcluirTodosArquivosSim /
+  /// CommandType::DeleteAllFiles). O equipamento responde com "files"
+  /// atualizado, igual ao delete_file.
+  void deleteAllFiles() => _sendCommand({'action': 'delete_all_files'});
+
+  /// Envia o nome escolhido para a medição pendente (ver
+  /// awaitingMeasurementName/suggestedMeasurementName em Esp32Device) e
+  /// espera a resposta do equipamento ("topico":"resultado_nome_medicao").
+  /// Se nomeExiste vier true, o app deve perguntar ao usuário se quer
+  /// sobrescrever e, em caso positivo, chamar de novo com
+  /// sobrescrever:true — mesmo fluxo de Tela::ExperimentoSobrescreverConfirmar
+  /// no menu físico.
+  Future<({bool ok, bool nomeExiste})> saveMeasurementName(
+    String nome, {
+    bool sobrescrever = false,
+  }) {
+    final resposta = _resultadoNomeMedicaoController.stream.first.timeout(
+      const Duration(seconds: 8),
+      onTimeout: () {
+        addLog(
+          'Sem resposta do equipamento ao salvar o nome da medicao.',
+          level: AppLogLevel.warning,
+        );
+        return (ok: false, nomeExiste: false);
+      },
+    );
+    _sendCommand({
+      'action': 'save_measurement_name',
+      'nome': nome,
+      'sobrescrever': sobrescrever,
+    });
+    return resposta;
+  }
+
+  /// Rascunhos locais (ver LocalDraftStore) — funcionam mesmo sem conexão
+  /// BLE, já que vivem só no armazenamento do celular/PC.
+  Future<List<LocalMeasurementDraft>> listLocalDrafts() =>
+      _localDraftStore.listar();
+
+  Future<String?> readLocalDraftContent(String id) =>
+      _localDraftStore.lerConteudo(id);
+
+  Future<void> deleteLocalDraft(String id) => _localDraftStore.excluir(id);
 
   void loadRepetition(String arquivo, int repeticao) => _sendCommand({
     'action': 'load_repetition',

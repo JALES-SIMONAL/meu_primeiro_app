@@ -28,6 +28,8 @@ class _GerenciamentoArquivosPageState
 
   @override
   Widget build(BuildContext context) {
+    final arquivos = ref.watch(appControllerProvider).deviceFiles;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Arquivos'),
@@ -39,12 +41,50 @@ class _GerenciamentoArquivosPageState
           ),
         ],
       ),
-      body: DeviceFileListView(
-        onTap: (arquivo) => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => ArquivoDetalhePage(arquivo: arquivo),
+      body: Column(
+        children: [
+          Expanded(
+            child: DeviceFileListView(
+              onTap: (arquivo) => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => ArquivoDetalhePage(arquivo: arquivo),
+                ),
+              ),
+            ),
           ),
-        ),
+          if (arquivos.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+              child: BorderedListTile(
+                leading: const Icon(Icons.delete_sweep_outlined),
+                title: const Text('Excluir todos os arquivos .csv'),
+                onTap: () async {
+                  final confirmar = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Excluir todos os arquivos .csv?'),
+                      content: const Text(
+                        'Todas as coletas salvas no cartao do equipamento serao apagadas. Essa acao nao pode ser desfeita.',
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(false),
+                          child: const Text('Nao'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.of(context).pop(true),
+                          child: const Text('Sim'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmar == true) {
+                    ref.read(appControllerProvider.notifier).deleteAllFiles();
+                  }
+                },
+              ),
+            ),
+        ],
       ),
     );
   }

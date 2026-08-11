@@ -5,7 +5,9 @@ import '../../providers/app_controller.dart';
 import '../../widgets/bordered_list_tile.dart';
 import '../../widgets/section_header.dart';
 import '../about/about_page.dart';
+import '../bluetooth/bluetooth_page.dart';
 import '../equipment/configuracoes/configuracoes_page.dart';
+import '../equipment/experimentos/rascunhos_locais_page.dart';
 import '../logs/logs_page.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -70,21 +72,13 @@ class SettingsPage extends ConsumerWidget {
                     runSpacing: 12,
                     children: [
                       FilledButton.icon(
-                        onPressed: state.bleScanning
-                            ? null
-                            : controller.startBleScan,
-                        icon: state.bleScanning
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Icon(Icons.bluetooth_searching),
-                        label: Text(
-                          state.bleScanning ? 'Escaneando...' : 'Escanear',
+                        onPressed: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const BluetoothPage(),
+                          ),
                         ),
+                        icon: const Icon(Icons.bluetooth_searching),
+                        label: const Text('Escanear'),
                       ),
                       FilledButton.tonal(
                         onPressed: state.bleConnected
@@ -99,6 +93,16 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
+          BorderedListTile(
+            leading: const Icon(Icons.drafts_outlined),
+            title: const Text('Rascunhos locais'),
+            subtitle: const Text(
+              'Medicoes finalizadas sem nome salvo no equipamento',
+            ),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const RascunhosLocaisPage()),
+            ),
+          ),
           BorderedListTile(
             leading: const Icon(Icons.list_alt_rounded),
             title: const Text('Logs'),

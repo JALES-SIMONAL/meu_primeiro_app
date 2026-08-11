@@ -25,6 +25,13 @@ class AppState {
   final List<DeviceFile> deviceFiles;
   final List<ChannelLiveState> channelLiveStates;
   final List<AnalysisEvent> loadedAnalysisEvents;
+
+  // Eventos da repeticao em andamento, chegando ao vivo via BLE ("topico":
+  // "event", bluetooth_app.cpp::publicarEvento) enquanto o experimento
+  // esta ativo — distinto de loadedAnalysisEvents, que carrega uma
+  // repeticao ja salva sob demanda ("load_repetition"). Zerado a cada novo
+  // experimento/repeticao (ver AppController).
+  final List<AnalysisEvent> liveExperimentEvents;
   final List<FileDataRow> fileDataRows;
   final bool fileDataHasMore;
 
@@ -54,6 +61,7 @@ class AppState {
     required this.deviceFiles,
     required this.channelLiveStates,
     required this.loadedAnalysisEvents,
+    this.liveExperimentEvents = const [],
     required this.fileDataRows,
     required this.fileDataHasMore,
     this.circularAnalysisLoading = false,
@@ -98,6 +106,7 @@ class AppState {
     List<DeviceFile>? deviceFiles,
     List<ChannelLiveState>? channelLiveStates,
     List<AnalysisEvent>? loadedAnalysisEvents,
+    List<AnalysisEvent>? liveExperimentEvents,
     List<FileDataRow>? fileDataRows,
     bool? fileDataHasMore,
     bool? circularAnalysisLoading,
@@ -124,6 +133,8 @@ class AppState {
       deviceFiles: deviceFiles ?? this.deviceFiles,
       channelLiveStates: channelLiveStates ?? this.channelLiveStates,
       loadedAnalysisEvents: loadedAnalysisEvents ?? this.loadedAnalysisEvents,
+      liveExperimentEvents:
+          liveExperimentEvents ?? this.liveExperimentEvents,
       fileDataRows: fileDataRows ?? this.fileDataRows,
       fileDataHasMore: fileDataHasMore ?? this.fileDataHasMore,
       circularAnalysisLoading:

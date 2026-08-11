@@ -13,44 +13,51 @@ class LogsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(appControllerProvider);
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SectionHeader(
-            title: 'Logs',
-            subtitle: 'Eventos do parser, MQTT, coleta e demo.',
-            trailing: TextButton(
-              onPressed: ref.read(appControllerProvider.notifier).clearLogs,
-              child: const Text('Limpar'),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: Column(
-                children: [
-                  for (final entry in state.logs.reversed)
-                    ListTile(
-                      leading: Icon(
-                        _iconFor(entry.level),
-                        color: _colorFor(entry.level),
-                      ),
-                      title: Text(entry.message),
-                      subtitle: Text(formatReceivedAt(entry.timestamp)),
-                    ),
-                  if (state.logs.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(18),
-                      child: Text('Nenhum log ainda.'),
-                    ),
-                ],
-              ),
-            ),
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Logs'),
+        actions: [
+          TextButton(
+            onPressed: ref.read(appControllerProvider.notifier).clearLogs,
+            child: const Text('Limpar'),
           ),
         ],
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SectionHeader(
+              title: 'Logs',
+              subtitle: 'Eventos do parser, MQTT, coleta e demo.',
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    for (final entry in state.logs.reversed)
+                      ListTile(
+                        leading: Icon(
+                          _iconFor(entry.level),
+                          color: _colorFor(entry.level),
+                        ),
+                        title: Text(entry.message),
+                        subtitle: Text(formatReceivedAt(entry.timestamp)),
+                      ),
+                    if (state.logs.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.all(18),
+                        child: Text('Nenhum log ainda.'),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

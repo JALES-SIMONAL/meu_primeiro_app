@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/app_controller.dart';
 import '../../services/bluetooth_service.dart';
 import '../../widgets/section_header.dart';
+import '../../widgets/zebra_row.dart';
 
 class BluetoothPage extends ConsumerWidget {
   const BluetoothPage({super.key});
@@ -80,14 +81,22 @@ class BluetoothPage extends ConsumerWidget {
                         ),
                       )
                     else
-                      ...state.bleScanResults.map(
-                        (device) => _DeviceTile(
-                          device: device,
-                          connected:
-                              state.bleConnected &&
-                              state.selectedDeviceId == device.id,
-                          onConnect: () =>
-                              controller.connectToDevice(device.id),
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: Column(
+                          children: [
+                            for (final (index, device)
+                                in state.bleScanResults.indexed)
+                              _DeviceTile(
+                                index: index,
+                                device: device,
+                                connected:
+                                    state.bleConnected &&
+                                    state.selectedDeviceId == device.id,
+                                onConnect: () =>
+                                    controller.connectToDevice(device.id),
+                              ),
+                          ],
                         ),
                       ),
                   ],
@@ -103,11 +112,13 @@ class BluetoothPage extends ConsumerWidget {
 
 class _DeviceTile extends StatelessWidget {
   const _DeviceTile({
+    required this.index,
     required this.device,
     required this.connected,
     required this.onConnect,
   });
 
+  final int index;
   final BleDeviceInfo device;
   final bool connected;
   final VoidCallback onConnect;
@@ -115,20 +126,37 @@ class _DeviceTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isKnown = device.isKnownDevice;
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      leading: Icon(
-        Icons.bluetooth,
-        color: isKnown ? const Color(0xFF04BBD3) : null,
+    return ZebraRow(
+      index: index,
+      selected: connected,
+      child: Row(
+        children: [
+          Icon(Icons.bluetooth, color: isKnown ? const Color(0xFF04BBD3) : null),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  device.name.isNotEmpty ? device.name : '(sem nome)',
+                  style: TextStyle(fontWeight: isKnown ? FontWeight.w700 : null),
+                ),
+                Text(
+                  '${device.id} • RSSI ${device.rssi} dBm',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          connected
+              ? const Chip(label: Text('Conectado'))
+              : FilledButton(
+                  onPressed: onConnect,
+                  child: const Text('Conectar'),
+                ),
+        ],
       ),
-      title: Text(
-        device.name.isNotEmpty ? device.name : '(sem nome)',
-        style: TextStyle(fontWeight: isKnown ? FontWeight.w700 : null),
-      ),
-      subtitle: Text('${device.id} • RSSI ${device.rssi} dBm'),
-      trailing: connected
-          ? const Chip(label: Text('Conectado'))
-          : FilledButton(onPressed: onConnect, child: const Text('Conectar')),
     );
   }
 }

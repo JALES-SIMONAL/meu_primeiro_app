@@ -32,6 +32,15 @@ set(CMAKE_CXX_FLAGS_PROFILE "${CMAKE_CXX_FLAGS_RELEASE}")
 # Use Unicode for all projects.
 add_definitions(-DUNICODE -D_UNICODE)
 
+# permission_handler_windows (transitive, via permission_handler — used only
+# on Android/iOS for BLE runtime permissions, see bluetooth_service.dart)
+# still includes <experimental/coroutine> for its /await usage. Recent MSVC
+# toolsets turn that into a hard static_assert (C2338/STL1011) instead of a
+# warning. No fix released upstream yet; this is the suppression macro named
+# directly in that error message. Must be defined before any add_subdirectory
+# call below so it reaches the plugin's own CMake target.
+add_definitions(-D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS)
+
 # Compilation settings that should be applied to most targets.
 #
 # Be cautious about adding new options here, as plugins use this function by

@@ -25,6 +25,15 @@ class Esp32Device {
   final int? sdUsedKb;
   final int? sdTotalKb;
 
+  // Medição finalizada (última repetição) mas ainda sem nome salvo no
+  // equipamento — ver experimentos::aguardandoNomeArquivo/nomeSugerido no
+  // firmware. suggestedMeasurementName só é significativo quando
+  // awaitingMeasurementName é true (vazio caso contrário, nunca null —
+  // Esp32Device.copyWith não distingue "não informado" de "limpar", ver
+  // comentário no construtor).
+  final bool awaitingMeasurementName;
+  final String suggestedMeasurementName;
+
   // Dados estáticos vindos do "topico":"info" (bluetooth_app.cpp::publicarInfoDispositivo),
   // enviados uma única vez logo após conectar (e de novo se o nome BLE mudar).
   final String? author;
@@ -52,6 +61,8 @@ class Esp32Device {
     this.experimentElapsedSeconds,
     this.sdUsedKb,
     this.sdTotalKb,
+    this.awaitingMeasurementName = false,
+    this.suggestedMeasurementName = '',
     this.author,
     this.manualUrl,
     this.bleDeviceName,
@@ -82,6 +93,8 @@ class Esp32Device {
     int? experimentElapsedSeconds,
     int? sdUsedKb,
     int? sdTotalKb,
+    bool? awaitingMeasurementName,
+    String? suggestedMeasurementName,
     String? author,
     String? manualUrl,
     String? bleDeviceName,
@@ -108,6 +121,10 @@ class Esp32Device {
           experimentElapsedSeconds ?? this.experimentElapsedSeconds,
       sdUsedKb: sdUsedKb ?? this.sdUsedKb,
       sdTotalKb: sdTotalKb ?? this.sdTotalKb,
+      awaitingMeasurementName:
+          awaitingMeasurementName ?? this.awaitingMeasurementName,
+      suggestedMeasurementName:
+          suggestedMeasurementName ?? this.suggestedMeasurementName,
       author: author ?? this.author,
       manualUrl: manualUrl ?? this.manualUrl,
       bleDeviceName: bleDeviceName ?? this.bleDeviceName,
