@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 
+import '../core/l10n/app_localizations.dart';
 import 'bordered_list_tile.dart';
 
 /// Linhas "Compartilhar"/"Baixar" reaproveitadas por qualquer tela que
@@ -45,9 +46,7 @@ class _CsvExportTilesState extends State<CsvExportTiles> {
       final conteudo = await widget.buscarConteudo();
       if (conteudo == null && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Arquivo vazio ou sem resposta do equipamento.'),
-          ),
+          SnackBar(content: Text(context.tr('csvExport.emptyOrNoResponse'))),
         );
       }
       return conteudo;
@@ -75,7 +74,9 @@ class _CsvExportTilesState extends State<CsvExportTiles> {
         ),
       );
     } catch (error) {
-      if (mounted) _mostrarErro('Nao foi possivel compartilhar: $error');
+      if (mounted) {
+        _mostrarErro(context.tr('csvExport.shareError', params: {'error': '$error'}));
+      }
     }
   }
 
@@ -105,11 +106,20 @@ class _CsvExportTilesState extends State<CsvExportTiles> {
       if (caminho == null) return; // usuario cancelou o dialogo
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${widget.nomeBase}.csv salvo em $caminho')),
+          SnackBar(
+            content: Text(
+              context.tr(
+                'csvExport.downloadedSnackbar',
+                params: {'name': widget.nomeBase, 'path': caminho},
+              ),
+            ),
+          ),
         );
       }
     } catch (error) {
-      if (mounted) _mostrarErro('Nao foi possivel baixar: $error');
+      if (mounted) {
+        _mostrarErro(context.tr('csvExport.downloadError', params: {'error': '$error'}));
+      }
     }
   }
 
@@ -166,8 +176,8 @@ class _CsvExportTilesState extends State<CsvExportTiles> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.share_outlined),
-            title: const Text('Compartilhar'),
-            subtitle: const Text('Email, Drive, WhatsApp e outros apps'),
+            title: Text(context.tr('csvExport.share')),
+            subtitle: Text(context.tr('csvExport.shareSubtitle')),
             onTap: _processando ? null : _compartilhar,
           ),
         BorderedListTile(
@@ -178,8 +188,8 @@ class _CsvExportTilesState extends State<CsvExportTiles> {
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
               : const Icon(Icons.download_outlined),
-          title: const Text('Baixar'),
-          subtitle: const Text('Salvar o arquivo direto no dispositivo'),
+          title: Text(context.tr('csvExport.download')),
+          subtitle: Text(context.tr('csvExport.downloadSubtitle')),
           onTap: _processando ? null : _baixar,
         ),
       ],

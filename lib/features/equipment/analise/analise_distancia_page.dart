@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../models/analysis_event.dart';
 import '../../../providers/app_controller.dart';
 import 'analise_resultado_page.dart';
@@ -27,7 +28,7 @@ class _AnaliseDistanciaPageState extends ConsumerState<AnaliseDistanciaPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Distancia')),
+      appBar: AppBar(title: Text(context.tr('analysisDistance.title'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
@@ -54,7 +55,7 @@ class _AnaliseDistanciaPageState extends ConsumerState<AnaliseDistanciaPage> {
               ],
             ),
             const SizedBox(height: 16),
-            FilledButton(
+            FilledButton.icon(
               onPressed: () {
                 final resultado = ref
                     .read(appControllerProvider.notifier)
@@ -72,7 +73,8 @@ class _AnaliseDistanciaPageState extends ConsumerState<AnaliseDistanciaPage> {
                   ),
                 );
               },
-              child: const Text('Calcular'),
+              icon: const Icon(Icons.calculate_outlined),
+              label: Text(context.tr('analysisDistance.calculate')),
             ),
           ],
         ),

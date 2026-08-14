@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/analysis_event.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/app_table_header.dart';
+import '../../../widgets/signal_level_icon.dart';
 import '../../../widgets/zebra_row.dart';
 import 'analise_distancia_page.dart';
 
@@ -25,15 +28,21 @@ class _AnaliseEventosPageState extends ConsumerState<AnaliseEventosPage> {
 
   @override
   Widget build(BuildContext context) {
-    final eventos = ref.watch(appControllerProvider).loadedAnalysisEvents;
+    final eventos = ref.watch(appControllerProvider.select((s) => s.loadedAnalysisEvents));
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Eventos')),
+      appBar: AppBar(title: Text(context.tr('analysisEvents.title'))),
       body: eventos.isEmpty
-          ? const Center(child: Text('Repeticao sem eventos.'))
+          ? Center(child: Text(context.tr('analysisEvents.empty')))
           : Column(
               children: [
-                const _EventosCabecalho(),
+                AppTableHeader(
+                  columns: [
+                    Text(context.tr('analysisEvents.tableIndex')),
+                    Text(context.tr('analysisEvents.tableChannelState')),
+                    Text(context.tr('analysisEvents.tableCollectionTime')),
+                  ],
+                ),
                 Expanded(
                   child: ListView.builder(
                     itemCount: eventos.length,
@@ -67,9 +76,14 @@ class _AnaliseEventosPageState extends ConsumerState<AnaliseEventosPage> {
                             Expanded(
                               child: Row(
                                 children: [
-                                  Text('Canal ${evento.channel}'),
-                                  const SizedBox(width: 24),
-                                  Text(evento.state),
+                                  SignalLevelIcon(high: evento.state == 'H', size: 22),
+                                  const SizedBox(width: 12),
+                                  Text(
+                                    context.tr(
+                                      'channelConfig.channelLabel',
+                                      params: {'n': '${evento.channel}'},
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),
@@ -82,28 +96,6 @@ class _AnaliseEventosPageState extends ConsumerState<AnaliseEventosPage> {
                 ),
               ],
             ),
-    );
-  }
-}
-
-class _EventosCabecalho extends StatelessWidget {
-  const _EventosCabecalho();
-
-  @override
-  Widget build(BuildContext context) {
-    final estilo = Theme.of(
-      context,
-    ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700);
-    return Container(
-      color: Theme.of(context).colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          SizedBox(width: 36, child: Text('#', style: estilo)),
-          Expanded(child: Text('Canal / Estado', style: estilo)),
-          Text('Tempo de coleta', style: estilo),
-        ],
-      ),
     );
   }
 }

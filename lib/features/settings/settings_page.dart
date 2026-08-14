@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n/app_localizations.dart';
 import '../../providers/app_controller.dart';
 import '../../widgets/bordered_list_tile.dart';
+import '../../widgets/language_selector_tile.dart';
 import '../../widgets/section_header.dart';
 import '../about/about_page.dart';
 import '../bluetooth/bluetooth_page.dart';
@@ -15,7 +17,7 @@ class SettingsPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(appControllerProvider);
+    final bleConnected = ref.watch(appControllerProvider.select((s) => s.bleConnected));
     final controller = ref.read(appControllerProvider.notifier);
 
     return SingleChildScrollView(
@@ -24,26 +26,24 @@ class SettingsPage extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SectionHeader(
-            title: 'Equipamento',
-            subtitle: state.bleConnected
-                ? 'Configuracoes do equipamento conectado.'
-                : 'Conecte via Bluetooth para acessar as configuracoes do equipamento.',
+            title: context.tr('settings.equipmentSection'),
+            subtitle: bleConnected
+                ? context.tr('settings.equipmentSectionSubtitleConnected')
+                : context.tr('settings.equipmentSectionSubtitleDisconnected'),
           ),
           const SizedBox(height: 12),
           BorderedListTile(
             leading: const Icon(Icons.tune),
-            title: const Text('Configuracoes do equipamento'),
-            subtitle: const Text(
-              'Modo de operacao, brilho, volume, canais, manual, sobre',
-            ),
+            title: Text(context.tr('settings.equipmentTile')),
+            subtitle: Text(context.tr('settings.equipmentTileSubtitle')),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const ConfiguracoesPage()),
             ),
           ),
           const SizedBox(height: 24),
           SectionHeader(
-            title: 'Aplicativo',
-            subtitle: 'Bluetooth, logs e informacoes gerais do app.',
+            title: context.tr('settings.appSection'),
+            subtitle: context.tr('settings.appSectionSubtitle'),
           ),
           const SizedBox(height: 12),
           Card(
@@ -55,13 +55,20 @@ class SettingsPage extends ConsumerWidget {
                   Row(
                     children: [
                       Icon(
-                        state.bleConnected
+                        bleConnected
                             ? Icons.bluetooth_connected
                             : Icons.bluetooth_disabled,
                       ),
                       const SizedBox(width: 8),
                       Text(
-                        'Bluetooth: ${state.bleConnected ? "Conectado" : "Desconectado"}',
+                        context.tr(
+                          'settings.bluetoothLabel',
+                          params: {
+                            'status': bleConnected
+                                ? context.tr('common.connected')
+                                : context.tr('common.disconnected'),
+                          },
+                        ),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                     ],
@@ -78,13 +85,14 @@ class SettingsPage extends ConsumerWidget {
                           ),
                         ),
                         icon: const Icon(Icons.bluetooth_searching),
-                        label: const Text('Escanear'),
+                        label: Text(context.tr('common.scan')),
                       ),
-                      FilledButton.tonal(
-                        onPressed: state.bleConnected
+                      FilledButton.tonalIcon(
+                        onPressed: bleConnected
                             ? controller.disconnectBluetooth
                             : null,
-                        child: const Text('Desconectar'),
+                        icon: const Icon(Icons.bluetooth_disabled),
+                        label: Text(context.tr('common.disconnect')),
                       ),
                     ],
                   ),
@@ -95,24 +103,23 @@ class SettingsPage extends ConsumerWidget {
           const SizedBox(height: 12),
           BorderedListTile(
             leading: const Icon(Icons.drafts_outlined),
-            title: const Text('Rascunhos locais'),
-            subtitle: const Text(
-              'Medicoes finalizadas sem nome salvo no equipamento',
-            ),
+            title: Text(context.tr('settings.localDrafts')),
+            subtitle: Text(context.tr('settings.localDraftsSubtitle')),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const RascunhosLocaisPage()),
             ),
           ),
           BorderedListTile(
             leading: const Icon(Icons.list_alt_rounded),
-            title: const Text('Logs'),
+            title: Text(context.tr('settings.logs')),
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const LogsPage())),
           ),
+          const LanguageSelectorTile(),
           BorderedListTile(
             leading: const Icon(Icons.info_rounded),
-            title: const Text('Sobre'),
+            title: Text(context.tr('settings.about')),
             onTap: () => Navigator.of(
               context,
             ).push(MaterialPageRoute(builder: (_) => const AboutPage())),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
 import '../../../widgets/ble_required_gate.dart';
@@ -18,38 +19,40 @@ class ConfiguracoesPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(appControllerProvider);
+    final analiseHabilitada = ref.watch(
+      appControllerProvider.select(
+        (s) => s.selectedDevice?.device.dataAnalysisEnabled ?? true,
+      ),
+    );
     final controller = ref.read(appControllerProvider.notifier);
-    final analiseHabilitada =
-        state.selectedDevice?.device.dataAnalysisEnabled ?? true;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Configuracoes')),
+      appBar: AppBar(title: Text(context.tr('equipmentSettings.title'))),
       body: BleRequiredGate(
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
             BorderedListTile(
               leading: const Icon(Icons.bluetooth_connected),
-              title: const Text('Conexao com app'),
+              title: Text(context.tr('equipmentSettings.appConnection')),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ConexaoAppPage()),
               ),
             ),
             BorderedListTile(
               leading: const Icon(Icons.settings_input_component),
-              title: const Text('Modo de operacao'),
+              title: Text(context.tr('equipmentSettings.operationMode')),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ModoOperacaoPage()),
               ),
             ),
             BorderedListTile(
               leading: const Icon(Icons.brightness_6),
-              title: const Text('Brilho da tela'),
+              title: Text(context.tr('equipmentSettings.brightness')),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => LevelEditPage(
-                    title: 'Brilho',
+                    title: context.tr('equipmentSettings.brightness'),
                     initialValue:
                         ref
                             .read(appControllerProvider)
@@ -64,11 +67,11 @@ class ConfiguracoesPage extends ConsumerWidget {
             ),
             BorderedListTile(
               leading: const Icon(Icons.volume_up),
-              title: const Text('Volume'),
+              title: Text(context.tr('equipmentSettings.volume')),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(
                   builder: (_) => LevelEditPage(
-                    title: 'Volume',
+                    title: context.tr('equipmentSettings.volume'),
                     initialValue:
                         ref
                             .read(appControllerProvider)
@@ -83,29 +86,33 @@ class ConfiguracoesPage extends ConsumerWidget {
             ),
             BorderedListTile(
               leading: const Icon(Icons.sensors),
-              title: const Text('Config. canais/sensores'),
+              title: Text(context.tr('equipmentSettings.channelConfig')),
               onTap: () => Navigator.of(context).push(
                 MaterialPageRoute(builder: (_) => const ConfigCanaisPage()),
               ),
             ),
             BorderedListTile(
               leading: const Icon(Icons.menu_book_outlined),
-              title: const Text('Manual'),
+              title: Text(context.tr('equipmentSettings.manual')),
               onTap: () => Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const ManualPage())),
             ),
             BorderedListTile(
               leading: const Icon(Icons.info_outline),
-              title: const Text('Sobre'),
+              title: Text(context.tr('equipmentSettings.about')),
               onTap: () => Navigator.of(
                 context,
               ).push(MaterialPageRoute(builder: (_) => const SobrePage())),
             ),
             BorderedListTile(
               leading: const Icon(Icons.query_stats),
-              title: const Text('Analise de dados'),
-              subtitle: Text(analiseHabilitada ? 'Ativada' : 'Desativada'),
+              title: Text(context.tr('equipmentSettings.dataAnalysis')),
+              subtitle: Text(
+                analiseHabilitada
+                    ? context.tr('equipmentSettings.dataAnalysisEnabled')
+                    : context.tr('equipmentSettings.dataAnalysisDisabled'),
+              ),
               trailing: Switch(
                 value: analiseHabilitada,
                 onChanged: (novoValor) async {
@@ -119,9 +126,7 @@ class ConfiguracoesPage extends ConsumerWidget {
                   );
                   if (!ok && context.mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Nao foi possivel alterar.'),
-                      ),
+                      SnackBar(content: Text(context.tr('equipmentSettings.changeError'))),
                     );
                   }
                 },

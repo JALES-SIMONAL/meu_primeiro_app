@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../providers/app_controller.dart';
 
 /// Equivalente a maquina_estados::Tela::ArquivoRenomear (editor de nome do
@@ -32,7 +33,7 @@ class _ArquivoRenomearPageState extends ConsumerState<ArquivoRenomearPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Renomear')),
+      appBar: AppBar(title: Text(context.tr('fileRename.title'))),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -41,10 +42,10 @@ class _ArquivoRenomearPageState extends ConsumerState<ArquivoRenomearPage> {
             TextField(
               controller: _controller,
               maxLength: 10,
-              decoration: const InputDecoration(labelText: 'Novo nome'),
+              decoration: InputDecoration(labelText: context.tr('fileRename.newName')),
             ),
             const SizedBox(height: 12),
-            FilledButton(
+            FilledButton.icon(
               onPressed: () {
                 final novoNome = _controller.text.trim();
                 if (novoNome.isEmpty) return;
@@ -55,7 +56,8 @@ class _ArquivoRenomearPageState extends ConsumerState<ArquivoRenomearPage> {
                   ..pop()
                   ..pop();
               },
-              child: const Text('Salvar'),
+              icon: const Icon(Icons.save_outlined),
+              label: Text(context.tr('common.save')),
             ),
           ],
         ),

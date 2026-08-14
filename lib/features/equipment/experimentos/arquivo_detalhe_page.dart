@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../models/device_file.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
@@ -46,11 +47,15 @@ class _ArquivoDetalhePageState extends ConsumerState<ArquivoDetalhePage> {
       appBar: AppBar(title: Text(arquivo.name)),
       body: ListView(
         children: [
-          ListTile(title: Text('Tamanho: ${arquivo.sizeBytes} bytes')),
+          ListTile(
+            title: Text(
+              context.tr('fileDetail.sizeLabel', params: {'size': '${arquivo.sizeBytes}'}),
+            ),
+          ),
           const SizedBox(height: 8),
           BorderedListTile(
             leading: const Icon(Icons.table_rows_outlined),
-            title: const Text('Ver dados'),
+            title: Text(context.tr('fileDetail.viewData')),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => ArquivoDadosPage(arquivo: arquivo.name),
@@ -64,7 +69,7 @@ class _ArquivoDetalhePageState extends ConsumerState<ArquivoDetalhePage> {
           ),
           BorderedListTile(
             leading: const Icon(Icons.edit_outlined),
-            title: const Text('Renomear'),
+            title: Text(context.tr('common.rename')),
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                 builder: (_) => ArquivoRenomearPage(nomeAtual: arquivo.name),
@@ -73,20 +78,22 @@ class _ArquivoDetalhePageState extends ConsumerState<ArquivoDetalhePage> {
           ),
           BorderedListTile(
             leading: const Icon(Icons.delete_outline),
-            title: const Text('Excluir'),
+            title: Text(context.tr('common.delete')),
             onTap: () async {
               final confirmar = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: Text('Excluir ${arquivo.name}?'),
+                  title: Text(
+                    context.tr('fileDetail.deleteConfirmTitle', params: {'name': arquivo.name}),
+                  ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Nao'),
+                      child: Text(context.tr('common.no')),
                     ),
                     FilledButton(
                       onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Sim'),
+                      child: Text(context.tr('common.yes')),
                     ),
                   ],
                 ),

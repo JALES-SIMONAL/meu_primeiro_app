@@ -3,13 +3,20 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../models/app_state.dart';
+import '../../../core/l10n/app_localizations.dart';
+import '../../../core/theme/app_colors.dart';
+import '../../../models/channel_edge_mode.dart';
 import '../../../models/channel_live_state.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/channel_config_sheet.dart';
+import '../../../widgets/edge_mode_icon.dart';
+import '../../../widgets/signal_level_icon.dart';
 
 /// Equivalente a maquina_estados::Tela::TesteCanais — nível ao vivo de cada
 /// canal, alimentado pela mensagem BLE "teste_canais" (publicada a cada
-/// ~300ms independente da tela atual no display físico).
+/// ~300ms independente da tela atual no display físico). Cada canal também
+/// tem um botão de configuração (modo de borda) ao lado — configurar e
+/// testar ficam na mesma tela, sem trocar de aba.
 class TesteCanaisPage extends ConsumerStatefulWidget {
   const TesteCanaisPage({super.key});
 
@@ -35,9 +42,14 @@ class _TesteCanaisPageState extends ConsumerState<TesteCanaisPage> {
     // feito localmente (encoder) — o firmware só aciona os LEDs quando sabe
     // que a tela de teste está aberta, e um teste iniciado só pelo app não
     // avisava o firmware disso.
-    WidgetsBinding.instance.addPostFrameCallback(
-      (_) => ref.read(appControllerProvider.notifier).setChannelTestActive(true),
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final controller = ref.read(appControllerProvider.notifier);
+      controller.setChannelTestActive(true);
+      // Garante que o botão de config. de cada canal mostre o modo
+      // realmente atual, mesmo se o usuário abriu esta tela sem antes
+      // passar por Configurações (que também pede isto sob demanda).
+      controller.getChannels();
+    });
   }
 
   @override
@@ -68,24 +80,73 @@ class _TesteCanaisPageState extends ConsumerState<TesteCanaisPage> {
     });
   }
 
+  void _abrirConfigCanal(int canal) {
+    showModalBottomSheet(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      // manageLiveTest: false — esta tela já liga o teste de canais remoto
+      // para si mesma (initState acima) e continua aberta por baixo do
+      // sheet; deixar o sheet também gerenciar isso desligaria o teste ao
+      // fechá-lo, mesmo com esta tela ainda visível.
+      builder: (context) => ChannelConfigSheet(canal: canal, manageLiveTest: false),
+    );
+  }
+
+  Future<void> _restaurarPadrao() async {
+    final confirmar = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.tr('channelConfig.restoreConfirmTitle')),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(context.tr('common.no')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(context.tr('common.yes')),
+          ),
+        ],
+      ),
+    );
+    if (confirmar == true && mounted) {
+      ref.read(appControllerProvider.notifier).restoreChannelDefaults();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    ref.listen<AppState>(appControllerProvider, (previous, next) {
-      _registrarEventos(next.channelLiveStates);
+    ref.listen(appControllerProvider.select((s) => s.channelLiveStates), (previous, next) {
+      _registrarEventos(next);
     });
 
-    final canais = ref.watch(appControllerProvider).channelLiveStates;
+    final (canais, channelConfigs) = ref.watch(
+      appControllerProvider.select((s) => (s.channelLiveStates, s.channelConfigs)),
+    );
+    final configs = {for (final c in channelConfigs) c.channel: c.mode};
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Teste de canais')),
+      appBar: AppBar(
+        title: Text(context.tr('channelTest.title')),
+        actions: [
+          IconButton(
+            tooltip: context.tr('channelConfig.restoreDefaults'),
+            icon: const Icon(Icons.restore),
+            onPressed: _restaurarPadrao,
+          ),
+        ],
+      ),
       body: canais.isEmpty
-          ? const Center(child: Text('Aguardando dados do equipamento...'))
+          ? Center(child: Text(context.tr('channelTest.waiting')))
           : ListView(
               children: [
                 for (final canal in canais)
                   _CanalTile(
                     canal: canal,
                     piscando: _canaisPiscando.contains(canal.channel),
+                    modo: configs[canal.channel] ?? ChannelEdgeMode.both,
+                    onConfigurar: () => _abrirConfigCanal(canal.channel),
                   ),
               ],
             ),
@@ -96,30 +157,58 @@ class _TesteCanaisPageState extends ConsumerState<TesteCanaisPage> {
 class _CanalTile extends StatelessWidget {
   final ChannelLiveState canal;
   final bool piscando;
+  final ChannelEdgeMode modo;
+  final VoidCallback onConfigurar;
 
-  const _CanalTile({required this.canal, required this.piscando});
+  const _CanalTile({
+    required this.canal,
+    required this.piscando,
+    required this.modo,
+    required this.onConfigurar,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // LOW=verde, HIGH=vermelho — mesma convenção do NeoPixel físico (ver
-    // atualizarTelasAoVivo() em maquina_estados.cpp).
-    final corBase = canal.high ? Colors.red : Colors.green;
+    // High=verde, Low=vermelho — mesmas cores do selo SignalLevelIcon. A cor
+    // nunca é o único sinal: o selo sempre traz a letra "H"/"L" junto.
+    final colorScheme = Theme.of(context).colorScheme;
+    final corBase = canal.high ? AppColors.levelHigh : colorScheme.error;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 80),
       color: piscando ? corBase.withValues(alpha: 0.15) : Colors.transparent,
       child: ListTile(
         leading: AnimatedScale(
           duration: const Duration(milliseconds: 80),
-          scale: piscando ? 1.4 : 1.0,
-          child: Icon(
-            Icons.circle,
-            color: piscando ? corBase.withValues(alpha: 1.0) : corBase,
-          ),
+          scale: piscando ? 1.15 : 1.0,
+          child: SignalLevelIcon(high: canal.high),
         ),
-        title: Text('Canal ${canal.channel}'),
-        subtitle: Text(canal.high ? 'HIGH' : 'LOW'),
-        trailing: Text('${canal.changeCount} mudancas'),
+        title: Text(context.tr('channelConfig.channelLabel', params: {'n': '${canal.channel}'})),
+        subtitle: Text(
+          '${canal.high ? context.tr('channelTest.high') : context.tr('channelTest.low')} • '
+          '${context.tr('channelTest.changesCount', params: {'count': '${canal.changeCount}'})}',
+        ),
+        trailing: _BotaoConfigCanal(modo: modo, onPressed: onConfigurar),
       ),
+    );
+  }
+}
+
+/// Botão de configuração do canal: mostra o modo de borda ATUAL (ícone +
+/// rótulo) e, ao ser pressionado, abre o bottom sheet de edição
+/// (ChannelConfigSheet) — configurar e testar o canal ficam disponíveis na
+/// mesma tela, sem navegar para Configurações.
+class _BotaoConfigCanal extends StatelessWidget {
+  const _BotaoConfigCanal({required this.modo, required this.onPressed});
+
+  final ChannelEdgeMode modo;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return ActionChip(
+      avatar: EdgeModeIcon(mode: modo, size: 20),
+      label: Text(modo.trLabel(context)),
+      onPressed: onPressed,
     );
   }
 }

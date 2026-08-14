@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
 import 'analise_circular_grafico_page.dart';
@@ -29,18 +30,20 @@ class AnaliseCircularEscolherRepeticaoPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Qual repeticao?')),
+      appBar: AppBar(title: Text(context.tr('circularChooseRepetition.title'))),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
           for (var i = 0; i < total; i++)
             BorderedListTile(
-              title: Text('Rep ${i + 1}'),
+              title: Text(
+                context.tr('circularChooseRepetition.repetitionLabel', params: {'n': '${i + 1}'}),
+              ),
               onTap: () => _abrir(context, ref, i),
             ),
           BorderedListTile(
             leading: const Icon(Icons.functions),
-            title: const Text('Media'),
+            title: Text(context.tr('circularChooseRepetition.average')),
             onTap: () => _abrir(context, ref, null),
           ),
         ],

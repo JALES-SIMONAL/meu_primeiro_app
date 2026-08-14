@@ -1,121 +1,119 @@
 import 'package:flutter/material.dart';
 
-class AppTheme {
-  static const Color black = Color(0xFF000000);
-  static const Color cyan = Color(0xFF04BBD3);
-  static const Color white = Color(0xFFFFFFFF);
-  static const Color success = Color(0xFF2E7D32);
-  static const Color danger = Color(0xFFC62828);
-  static const Color neutral = Color(0xFF7A7A7A);
-  static const Color warning = Color(0xFFF9A825);
-  static const Color background = Color(0xFFF5F7F8);
+import 'app_colors.dart';
 
-  static ThemeData light() {
-    final colorScheme = const ColorScheme(
-      brightness: Brightness.light,
-      primary: black,
-      onPrimary: white,
-      secondary: cyan,
-      onSecondary: black,
-      error: danger,
-      onError: white,
-      surface: white,
-      onSurface: black,
-      primaryContainer: Color(0xFFE6F9FB),
-      onPrimaryContainer: black,
-      secondaryContainer: Color(0xFFD8FBFF),
-      onSecondaryContainer: black,
-      tertiary: success,
-      onTertiary: white,
-      tertiaryContainer: Color(0xFFE2F2E3),
-      onTertiaryContainer: black,
-      outline: Color(0xFFCAD1D5),
-      surfaceContainerHighest: Color(0xFFECEFF1),
-      surfaceTint: cyan,
-      scrim: Color(0x66000000),
-      inverseSurface: black,
-      onInverseSurface: white,
-      inversePrimary: cyan,
+/// Tema MD3 (Material Design 3) gerado a partir das cores-semente do logo
+/// (ver app_colors.dart). `ColorScheme.fromSeed` já entrega uma escala
+/// tonal completa e acessível (containers, outlines, superfícies, par
+/// light/dark) a partir do ciano do logo; os papéis secondary/tertiary são
+/// ajustados por cima para refletir o azul-marinho e o amarelo-banana do
+/// logo, mantendo a relação de contraste gerada pelo MD3.
+class AppTheme {
+  AppTheme._();
+
+  static ThemeData light() => _build(Brightness.light);
+  static ThemeData dark() => _build(Brightness.dark);
+
+  static ThemeData _build(Brightness brightness) {
+    final bool isDark = brightness == Brightness.dark;
+
+    final ColorScheme base = ColorScheme.fromSeed(
+      seedColor: AppColors.primarySeed,
+      brightness: brightness,
+    );
+
+    final ColorScheme colorScheme = base.copyWith(
+      secondary: AppColors.secondarySeed,
+      onSecondary: Colors.white,
+      secondaryContainer: Color.lerp(
+        AppColors.secondarySeed,
+        isDark ? Colors.black : Colors.white,
+        isDark ? 0.6 : 0.85,
+      ),
+      onSecondaryContainer: isDark ? Colors.white : AppColors.secondarySeed,
+      tertiary: AppColors.tertiarySeed,
+      onTertiary: Colors.black,
+      tertiaryContainer: Color.lerp(
+        AppColors.tertiarySeed,
+        isDark ? Colors.black : Colors.white,
+        isDark ? 0.6 : 0.85,
+      ),
+      onTertiaryContainer: isDark ? Colors.white : const Color(0xFF5C3D00),
+      // O nível "L" (SignalLevelIcon) e a "Borda de Subida" (EdgeModeIcon)
+      // reaproveitam este vermelho; a "Borda de Descida" reaproveita
+      // tertiary (amarelo-banana) acima.
+      error: AppColors.errorSeed,
+      onError: Colors.white,
     );
 
     return ThemeData(
       useMaterial3: true,
+      brightness: brightness,
       colorScheme: colorScheme,
-      scaffoldBackgroundColor: background,
-      appBarTheme: const AppBarTheme(
+      scaffoldBackgroundColor: colorScheme.surface,
+      appBarTheme: AppBarTheme(
         centerTitle: false,
-        backgroundColor: black,
-        foregroundColor: white,
-      ),
-      cardTheme: const CardThemeData(
+        backgroundColor: colorScheme.surface,
+        foregroundColor: colorScheme.onSurface,
         elevation: 0,
-        color: white,
-        surfaceTintColor: white,
+        scrolledUnderElevation: 1,
+      ),
+      cardTheme: CardThemeData(
+        elevation: 0,
+        color: colorScheme.surfaceContainerHighest,
+        surfaceTintColor: colorScheme.surfaceTint,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.all(Radius.circular(20)),
-          side: BorderSide(color: Color(0xFFCAD1D5)),
+          borderRadius: const BorderRadius.all(Radius.circular(20)),
+          side: BorderSide(color: colorScheme.outlineVariant),
         ),
       ),
-      navigationRailTheme: const NavigationRailThemeData(
-        backgroundColor: white,
-        selectedIconTheme: IconThemeData(color: cyan),
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: colorScheme.surface,
+        selectedIconTheme: IconThemeData(color: colorScheme.primary),
         selectedLabelTextStyle: TextStyle(
-          color: black,
+          color: colorScheme.onSurface,
           fontWeight: FontWeight.w600,
         ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: colorScheme.surface,
+        indicatorColor: colorScheme.secondaryContainer,
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: white,
+        fillColor: colorScheme.surfaceContainerHighest,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: Color(0xFFCAD1D5)),
+          borderSide: BorderSide(color: colorScheme.outline),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: const BorderSide(color: cyan, width: 1.5),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.5),
         ),
       ),
-      elevatedButtonTheme: ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: black,
-          foregroundColor: white,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
-          ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
         ),
       ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          side: BorderSide(color: colorScheme.outline),
+        ),
+      ),
       chipTheme: ChipThemeData(
-        backgroundColor: const Color(0xFFF0F3F5),
-        labelStyle: const TextStyle(color: black),
+        backgroundColor: colorScheme.surfaceContainerHighest,
+        labelStyle: TextStyle(color: colorScheme.onSurface),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
-      textTheme: const TextTheme(
-        headlineLarge: TextStyle(
-          fontSize: 32,
-          fontWeight: FontWeight.w800,
-          color: black,
-        ),
-        headlineMedium: TextStyle(
-          fontSize: 26,
-          fontWeight: FontWeight.w700,
-          color: black,
-        ),
-        titleLarge: TextStyle(
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-          color: black,
-        ),
-        titleMedium: TextStyle(
-          fontSize: 16,
-          fontWeight: FontWeight.w600,
-          color: black,
-        ),
-        bodyLarge: TextStyle(fontSize: 15, color: black),
-        bodyMedium: TextStyle(fontSize: 14, color: black),
-      ),
+      textTheme: Typography.material2021(platform: TargetPlatform.android)
+          .englishLike
+          .merge(Typography.material2021(platform: TargetPlatform.android).black)
+          .apply(bodyColor: colorScheme.onSurface, displayColor: colorScheme.onSurface),
     );
   }
 }

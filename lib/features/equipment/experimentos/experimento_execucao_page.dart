@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/analysis_event.dart';
 import '../../../providers/app_controller.dart';
+import '../../../widgets/app_table_header.dart';
+import '../../../widgets/signal_level_icon.dart';
 import '../../../widgets/zebra_row.dart';
 
 /// Equivalente a maquina_estados::Tela::ExperimentoRepeticoes +
@@ -29,13 +32,14 @@ class _ExperimentoExecucaoPageState
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(appControllerProvider);
+    final (device, liveExperimentEvents) = ref.watch(
+      appControllerProvider.select((s) => (s.selectedDevice?.device, s.liveExperimentEvents)),
+    );
     final controller = ref.read(appControllerProvider.notifier);
-    final device = state.selectedDevice?.device;
     final emAndamento = device?.experimentActive == true;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Rodar experimento livre')),
+      appBar: AppBar(title: Text(context.tr('experimentExecution.title'))),
       body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -51,11 +55,20 @@ class _ExperimentoExecucaoPageState
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Repeticao ${device?.repetitionCurrent ?? '-'} de ${device?.repetitionsTotal ?? '-'}',
+                        context.tr(
+                          'experimentExecution.repetitionOf',
+                          params: {
+                            'current': '${device?.repetitionCurrent ?? '-'}',
+                            'total': '${device?.repetitionsTotal ?? '-'}',
+                          },
+                        ),
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       Text(
-                        'Tempo decorrido: ${device?.experimentElapsedSeconds ?? 0}s',
+                        context.tr(
+                          'experimentExecution.elapsedTime',
+                          params: {'seconds': '${device?.experimentElapsedSeconds ?? 0}'},
+                        ),
                       ),
                     ],
                   ),
@@ -66,73 +79,82 @@ class _ExperimentoExecucaoPageState
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  FilledButton(
+                  FilledButton.icon(
                     onPressed: controller.finishRepetition,
-                    child: const Text('Finalizar repeticao'),
+                    icon: const Icon(Icons.stop_circle_outlined),
+                    label: Text(context.tr('experimentExecution.finishRepetition')),
                   ),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: () async {
                       final confirmar = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text('Reiniciar repeticao?'),
-                          content: const Text(
-                            'Os eventos ja registrados nesta repeticao serao descartados.',
+                          title: Text(
+                            context.tr('experimentExecution.restartRepetitionConfirmTitle'),
+                          ),
+                          content: Text(
+                            context.tr('experimentExecution.restartRepetitionConfirmContent'),
                           ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Nao'),
+                              child: Text(context.tr('common.no')),
                             ),
                             FilledButton(
                               onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Sim'),
+                              child: Text(context.tr('common.yes')),
                             ),
                           ],
                         ),
                       );
                       if (confirmar == true) controller.restartRepetition();
                     },
-                    child: const Text('Reiniciar repeticao'),
+                    icon: const Icon(Icons.replay),
+                    label: Text(context.tr('experimentExecution.restartRepetition')),
                   ),
-                  OutlinedButton(
+                  OutlinedButton.icon(
                     onPressed: () async {
                       final confirmar = await showDialog<bool>(
                         context: context,
                         builder: (context) => AlertDialog(
-                          title: const Text('Cancelar experimento?'),
+                          title: Text(
+                            context.tr('experimentExecution.cancelExperimentConfirmTitle'),
+                          ),
                           actions: [
                             TextButton(
                               onPressed: () => Navigator.of(context).pop(false),
-                              child: const Text('Nao'),
+                              child: Text(context.tr('common.no')),
                             ),
                             FilledButton(
                               onPressed: () => Navigator.of(context).pop(true),
-                              child: const Text('Sim'),
+                              child: Text(context.tr('common.yes')),
                             ),
                           ],
                         ),
                       );
                       if (confirmar == true) controller.cancelExperiment();
                     },
-                    child: const Text('Cancelar experimento'),
+                    icon: const Icon(Icons.cancel_outlined),
+                    label: Text(context.tr('experimentExecution.cancelExperiment')),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               Text(
-                'Eventos ao vivo',
+                context.tr('experimentExecution.liveEvents'),
                 style: Theme.of(context).textTheme.titleMedium,
               ),
               const SizedBox(height: 8),
-              Expanded(child: _EventosAoVivo(eventos: state.liveExperimentEvents)),
+              Expanded(child: _EventosAoVivo(eventos: liveExperimentEvents)),
             ] else ...[
               SizedBox(
                 width: 120,
                 child: TextField(
                   controller: _repetitionsController,
                   keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Repeticoes'),
+                  decoration: InputDecoration(
+                    labelText: context.tr('experimentExecution.repetitionsLabel'),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -141,7 +163,7 @@ class _ExperimentoExecucaoPageState
                   int.tryParse(_repetitionsController.text) ?? 1,
                 ),
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('Iniciar'),
+                label: Text(context.tr('experimentExecution.start')),
               ),
             ],
           ],
@@ -189,9 +211,13 @@ class _NomearMedicaoFormState extends ConsumerState<_NomearMedicaoForm> {
     setState(() => _salvando = false);
 
     if (resultado.ok) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Medicao salva como "$nome.csv".')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            context.tr('experimentExecution.savedSnackbar', params: {'name': nome}),
+          ),
+        ),
+      );
       return;
     }
 
@@ -199,18 +225,18 @@ class _NomearMedicaoFormState extends ConsumerState<_NomearMedicaoForm> {
       final confirmar = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Nome ja existe'),
+          title: Text(context.tr('experimentExecution.nameExistsTitle')),
           content: Text(
-            'Ja existe um arquivo "$nome.csv" no equipamento. Sobrescrever?',
+            context.tr('experimentExecution.nameExistsContent', params: {'name': nome}),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Nao'),
+              child: Text(context.tr('common.no')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Sobrescrever'),
+              child: Text(context.tr('experimentExecution.overwrite')),
             ),
           ],
         ),
@@ -221,9 +247,7 @@ class _NomearMedicaoFormState extends ConsumerState<_NomearMedicaoForm> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Nao foi possivel salvar a medicao. Tente novamente.'),
-        ),
+        SnackBar(content: Text(context.tr('experimentExecution.saveFailedSnackbar'))),
       );
     }
   }
@@ -237,15 +261,11 @@ class _NomearMedicaoFormState extends ConsumerState<_NomearMedicaoForm> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Medicao finalizada',
+              context.tr('experimentExecution.measurementFinished'),
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 4),
-            const Text(
-              'De um nome ao arquivo antes de salvar no equipamento. Se a '
-              'conexao cair agora, os eventos recebidos ate aqui ficam '
-              'salvos em "Rascunhos locais".',
-            ),
+            Text(context.tr('experimentExecution.measurementFinishedHelp')),
             const SizedBox(height: 12),
             TextField(
               controller: _nomeController,
@@ -255,7 +275,9 @@ class _NomearMedicaoFormState extends ConsumerState<_NomearMedicaoForm> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
               ],
-              decoration: const InputDecoration(labelText: 'Nome do arquivo'),
+              decoration: InputDecoration(
+                labelText: context.tr('experimentExecution.fileNameLabel'),
+              ),
               onSubmitted: (_) {
                 if (!_salvando) _salvar();
               },
@@ -271,7 +293,7 @@ class _NomearMedicaoFormState extends ConsumerState<_NomearMedicaoForm> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.save_outlined),
-                label: const Text('Salvar'),
+                label: Text(context.tr('common.save')),
               ),
             ),
           ],
@@ -319,33 +341,51 @@ class _EventosAoVivoState extends State<_EventosAoVivo> {
   @override
   Widget build(BuildContext context) {
     if (widget.eventos.isEmpty) {
-      return const Center(child: Text('Nenhum evento registrado ainda.'));
+      return Center(child: Text(context.tr('experimentExecution.noEventsYet')));
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      itemCount: widget.eventos.length,
-      itemBuilder: (context, index) {
-        final evento = widget.eventos[index];
-        return ZebraRow(
-          index: index,
-          child: Row(
-            children: [
-              SizedBox(width: 36, child: Text('E$index')),
-              Expanded(
+    return Column(
+      children: [
+        AppTableHeader(
+          columns: [
+            Text(context.tr('experimentExecution.tableIndex')),
+            Text(context.tr('experimentExecution.tableChannelState')),
+            Text(context.tr('experimentExecution.tableTime')),
+          ],
+        ),
+        Expanded(
+          child: ListView.builder(
+            controller: _scrollController,
+            itemCount: widget.eventos.length,
+            itemBuilder: (context, index) {
+              final evento = widget.eventos[index];
+              return ZebraRow(
+                index: index,
                 child: Row(
                   children: [
-                    Text('Canal ${evento.channel}'),
-                    const SizedBox(width: 24),
-                    Text(evento.state),
+                    SizedBox(width: 36, child: Text('E$index')),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          SignalLevelIcon(high: evento.state == 'H', size: 22),
+                          const SizedBox(width: 12),
+                          Text(
+                            context.tr(
+                              'channelConfig.channelLabel',
+                              params: {'n': '${evento.channel}'},
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(formatElapsedTime(evento.timestampUs ~/ 1000)),
                   ],
                 ),
-              ),
-              Text(formatElapsedTime(evento.timestampUs ~/ 1000)),
-            ],
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
     );
   }
 }

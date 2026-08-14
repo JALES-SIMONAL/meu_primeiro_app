@@ -1,14 +1,21 @@
-/// Espelha comandos::EdgeMode do firmware (canais.hpp).
-enum ChannelEdgeMode {
-  falling(0, 'H para L'),
-  rising(1, 'L para H'),
-  both(2, 'Ambos'),
-  disabled(3, 'Desabilitado');
+import 'package:flutter/widgets.dart';
 
-  const ChannelEdgeMode(this.value, this.label);
+import '../core/l10n/app_localizations.dart';
+
+/// Espelha comandos::EdgeMode do firmware (canais.hpp). A representação
+/// visual de cada modo (cores, selo geométrico) fica em EdgeModeIcon
+/// (widgets/edge_mode_icon.dart) — este enum só guarda o valor protocolar e
+/// a chave de tradução, para ter uma única fonte de verdade do desenho.
+enum ChannelEdgeMode {
+  falling(0, 'channelConfig.edgeFallingToLow'),
+  rising(1, 'channelConfig.edgeRisingToHigh'),
+  both(2, 'channelConfig.edgeBoth'),
+  disabled(3, 'channelConfig.edgeDisabled');
+
+  const ChannelEdgeMode(this.value, this.labelKey);
 
   final int value;
-  final String label;
+  final String labelKey;
 
   static ChannelEdgeMode fromValue(int value) {
     return ChannelEdgeMode.values.firstWhere(
@@ -16,6 +23,10 @@ enum ChannelEdgeMode {
       orElse: () => ChannelEdgeMode.both,
     );
   }
+}
+
+extension ChannelEdgeModeLabel on ChannelEdgeMode {
+  String trLabel(BuildContext context) => context.tr(labelKey);
 }
 
 class ChannelConfig {

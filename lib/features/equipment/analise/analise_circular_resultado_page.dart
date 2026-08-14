@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../models/circular_analysis_result.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
@@ -23,41 +24,41 @@ class AnaliseCircularResultadoPage extends ConsumerWidget {
     final r = resultado ?? CircularAverageResult.zero;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Resultado')),
+      appBar: AppBar(title: Text(context.tr('circularResult.title'))),
       body: ListView(
         padding: const EdgeInsets.all(12),
         children: [
           _InfoTile(
-            'Distancia',
+            context.tr('circularResult.distance'),
             '${r.distanciaMediaMetros.toStringAsFixed(3)}m',
           ),
           _InfoTile(
-            'Repeticoes',
+            context.tr('circularResult.repetitions'),
             '${r.repeticoesValidas}/${r.repeticoesTotais}',
           ),
           _InfoTile(
-            'Vel. media',
+            context.tr('circularResult.avgSpeed'),
             '${r.velocidadeMediaMs.toStringAsFixed(2)}m/s',
           ),
           _InfoTile(
-            'Acel. media',
+            context.tr('circularResult.avgAccel'),
             '${r.aceleracaoMediaMs2.toStringAsFixed(2)}m/s2',
           ),
-          _InfoTile('RPM medio', r.rpmMedia.toStringAsFixed(1)),
+          _InfoTile(context.tr('circularResult.avgRpm'), r.rpmMedia.toStringAsFixed(1)),
           const Divider(height: 24),
           BorderedListTile(
             leading: const Icon(Icons.show_chart),
-            title: const Text('Ver grafico veloc.'),
+            title: Text(context.tr('circularResult.viewSpeedChart')),
             onTap: () => _abrirGrafico(context, 'velocidade'),
           ),
           BorderedListTile(
             leading: const Icon(Icons.show_chart),
-            title: const Text('Ver grafico acel.'),
+            title: Text(context.tr('circularResult.viewAccelChart')),
             onTap: () => _abrirGrafico(context, 'aceleracao'),
           ),
           BorderedListTile(
             leading: const Icon(Icons.show_chart),
-            title: const Text('Ver grafico rpm'),
+            title: Text(context.tr('circularResult.viewRpmChart')),
             onTap: () => _abrirGrafico(context, 'rpm'),
           ),
         ],

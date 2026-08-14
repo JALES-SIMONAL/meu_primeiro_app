@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../models/circular_analysis_result.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/chart_ticks.dart';
@@ -23,9 +24,9 @@ class AnaliseCircularGraficoPage extends ConsumerWidget {
     );
 
     return Scaffold(
-      appBar: AppBar(title: Text(titulo ?? 'Grafico')),
+      appBar: AppBar(title: Text(titulo ?? context.tr('circularGraph.titleFallback'))),
       body: pontos.isEmpty
-          ? const Center(child: Text('Sem pontos suficientes para o grafico.'))
+          ? Center(child: Text(context.tr('circularGraph.noPoints')))
           : Padding(
               padding: const EdgeInsets.all(16),
               child: _InteractiveLineChart(pontos: pontos),
@@ -199,23 +200,29 @@ class _InteractiveLineChartState extends State<_InteractiveLineChart> {
             Expanded(
               child: Text(
                 _selected == null
-                    ? 'Toque no grafico para ver um valor exato. Arraste/belisque para navegar e dar zoom.'
-                    : 't=${_selected!.timeS.toStringAsFixed(3)}s  valor=${_selected!.value.toStringAsFixed(4)}',
+                    ? context.tr('circularGraph.tapHint')
+                    : context.tr(
+                        'circularGraph.pointInfo',
+                        params: {
+                          't': _selected!.timeS.toStringAsFixed(3),
+                          'v': _selected!.value.toStringAsFixed(4),
+                        },
+                      ),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
             ),
             IconButton(
-              tooltip: 'Diminuir zoom',
+              tooltip: context.tr('circularGraph.zoomOut'),
               icon: const Icon(Icons.zoom_out),
               onPressed: () => _zoom(0.5),
             ),
             IconButton(
-              tooltip: 'Aumentar zoom',
+              tooltip: context.tr('circularGraph.zoomIn'),
               icon: const Icon(Icons.zoom_in),
               onPressed: () => _zoom(2),
             ),
             IconButton(
-              tooltip: 'Resetar zoom',
+              tooltip: context.tr('circularGraph.zoomReset'),
               icon: const Icon(Icons.restart_alt),
               onPressed: zoomedIn ? () => setState(_resetView) : null,
             ),

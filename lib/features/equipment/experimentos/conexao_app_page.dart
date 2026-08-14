@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../providers/app_controller.dart';
 import '../../../widgets/bordered_list_tile.dart';
 import '../../../widgets/senha_dialog.dart';
@@ -11,34 +12,39 @@ class ConexaoAppPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(appControllerProvider);
+    final (device, bleConnected) = ref.watch(
+      appControllerProvider.select((s) => (s.selectedDevice?.device, s.bleConnected)),
+    );
     final controller = ref.read(appControllerProvider.notifier);
-    final device = state.selectedDevice?.device;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Conexao com app')),
+      appBar: AppBar(title: Text(context.tr('appConnection.title'))),
       body: ListView(
         children: [
           ListTile(
-            title: const Text('Bluetooth'),
-            trailing: Text(state.bleConnected ? 'Conectado' : 'Desconectado'),
+            title: Text(context.tr('appConnection.bluetooth')),
+            trailing: Text(
+              bleConnected
+                  ? context.tr('common.connected')
+                  : context.tr('common.disconnected'),
+            ),
           ),
           ListTile(
-            title: const Text('MAC'),
-            trailing: Text(device?.macAddress ?? '-'),
+            title: Text(context.tr('appConnection.mac')),
+            trailing: Text(device?.macAddress ?? context.tr('common.notAvailable')),
           ),
           ListTile(
-            title: const Text('ID'),
-            trailing: Text(device?.deviceId ?? '-'),
+            title: Text(context.tr('appConnection.id')),
+            trailing: Text(device?.deviceId ?? context.tr('common.notAvailable')),
           ),
           ListTile(
-            title: const Text('Nome BLE'),
-            trailing: Text(device?.bleDeviceName ?? '-'),
+            title: Text(context.tr('appConnection.bleName')),
+            trailing: Text(device?.bleDeviceName ?? context.tr('common.notAvailable')),
           ),
           const SizedBox(height: 8),
           BorderedListTile(
             leading: const Icon(Icons.edit_outlined),
-            title: const Text('Renomear'),
+            title: Text(context.tr('appConnection.rename')),
             trailing: null,
             onTap: () async {
               final controllerTexto = TextEditingController(
@@ -47,23 +53,23 @@ class ConexaoAppPage extends ConsumerWidget {
               final novoNome = await showDialog<String>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Renomear dispositivo BLE'),
+                  title: Text(context.tr('appConnection.renameDialogTitle')),
                   content: TextField(
                     controller: controllerTexto,
                     maxLength: 20,
                     autofocus: true,
-                    decoration: const InputDecoration(labelText: 'Nome'),
+                    decoration: InputDecoration(labelText: context.tr('appConnection.nameLabel')),
                   ),
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancelar'),
+                      child: Text(context.tr('common.cancel')),
                     ),
                     FilledButton(
                       onPressed: () => Navigator.of(
                         context,
                       ).pop(controllerTexto.text.trim()),
-                      child: const Text('Salvar'),
+                      child: Text(context.tr('common.save')),
                     ),
                   ],
                 ),
@@ -76,7 +82,7 @@ class ConexaoAppPage extends ConsumerWidget {
                 );
                 if (!ok && context.mounted) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Nao foi possivel renomear.')),
+                    SnackBar(content: Text(context.tr('appConnection.renameFailed'))),
                   );
                 }
               }
@@ -84,23 +90,21 @@ class ConexaoAppPage extends ConsumerWidget {
           ),
           BorderedListTile(
             leading: const Icon(Icons.sync),
-            title: const Text('Reconectar'),
+            title: Text(context.tr('appConnection.reconnect')),
             trailing: null,
             onTap: controller.reconnectDevice,
           ),
           BorderedListTile(
             leading: const Icon(Icons.password_outlined),
-            title: const Text('Trocar senha'),
-            subtitle: const Text(
-              'Usada para renomear o BLE e ativar/desativar Analise de dados',
-            ),
+            title: Text(context.tr('appConnection.changePassword')),
+            subtitle: Text(context.tr('appConnection.changePasswordSubtitle')),
             onTap: () async {
               final senhaAtualController = TextEditingController();
               final novaSenhaController = TextEditingController();
               final confirmar = await showDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Trocar senha'),
+                  title: Text(context.tr('appConnection.changePasswordDialogTitle')),
                   content: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -108,16 +112,16 @@ class ConexaoAppPage extends ConsumerWidget {
                         controller: senhaAtualController,
                         obscureText: true,
                         autofocus: true,
-                        decoration: const InputDecoration(
-                          labelText: 'Senha atual',
+                        decoration: InputDecoration(
+                          labelText: context.tr('appConnection.currentPassword'),
                         ),
                       ),
                       TextField(
                         controller: novaSenhaController,
                         obscureText: true,
                         maxLength: 10,
-                        decoration: const InputDecoration(
-                          labelText: 'Nova senha (3 a 10 caracteres)',
+                        decoration: InputDecoration(
+                          labelText: context.tr('appConnection.newPasswordLabel'),
                         ),
                       ),
                     ],
@@ -125,11 +129,11 @@ class ConexaoAppPage extends ConsumerWidget {
                   actions: [
                     TextButton(
                       onPressed: () => Navigator.of(context).pop(false),
-                      child: const Text('Cancelar'),
+                      child: Text(context.tr('common.cancel')),
                     ),
                     FilledButton(
                       onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Confirmar'),
+                      child: Text(context.tr('common.confirm')),
                     ),
                   ],
                 ),
@@ -139,9 +143,7 @@ class ConexaoAppPage extends ConsumerWidget {
               final novaSenha = novaSenhaController.text;
               if (novaSenha.length < 3 || novaSenha.length > 10) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('A nova senha deve ter de 3 a 10 caracteres.'),
-                  ),
+                  SnackBar(content: Text(context.tr('appConnection.passwordLengthError'))),
                 );
                 return;
               }
@@ -154,7 +156,9 @@ class ConexaoAppPage extends ConsumerWidget {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
                     content: Text(
-                      ok ? 'Senha alterada.' : 'Senha atual incorreta.',
+                      ok
+                          ? context.tr('appConnection.passwordChanged')
+                          : context.tr('appConnection.passwordIncorrect'),
                     ),
                   ),
                 );

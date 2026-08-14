@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../models/esp32_device.dart';
 import '../../../providers/app_controller.dart';
 
@@ -10,26 +11,27 @@ class ModoOperacaoPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(appControllerProvider);
+    final modo = ref.watch(
+      appControllerProvider.select((s) => s.selectedDevice?.device.operationMode),
+    );
     final controller = ref.read(appControllerProvider.notifier);
-    final modo = state.selectedDevice?.device.operationMode;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Modo de operacao')),
+      appBar: AppBar(title: Text(context.tr('operationMode.title'))),
       body: RadioGroup<DeviceOperationMode>(
         groupValue: modo,
         onChanged: (value) =>
             controller.setOperationMode(value == DeviceOperationMode.app),
         child: ListView(
-          children: const [
+          children: [
             RadioListTile<DeviceOperationMode>(
-              title: Text('Controle pelo hardware'),
-              subtitle: Text('Encoder e tecla do equipamento'),
+              title: Text(context.tr('operationMode.hardware')),
+              subtitle: Text(context.tr('operationMode.hardwareSubtitle')),
               value: DeviceOperationMode.hardware,
             ),
             RadioListTile<DeviceOperationMode>(
-              title: Text('Controle pelo aplicativo'),
-              subtitle: Text('Este app'),
+              title: Text(context.tr('operationMode.app')),
+              subtitle: Text(context.tr('operationMode.appSubtitle')),
               value: DeviceOperationMode.app,
             ),
           ],

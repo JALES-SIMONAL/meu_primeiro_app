@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/local_measurement_draft.dart';
 import '../../../providers/app_controller.dart';
@@ -42,7 +43,7 @@ class _RascunhosLocaisPageState extends ConsumerState<RascunhosLocaisPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rascunhos locais'),
+        title: Text(context.tr('localDrafts.title')),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -62,14 +63,10 @@ class _RascunhosLocaisPageState extends ConsumerState<RascunhosLocaisPage> {
             onRefresh: _recarregar,
             child: rascunhos.isEmpty
                 ? ListView(
-                    children: const [
+                    children: [
                       Padding(
-                        padding: EdgeInsets.all(24),
-                        child: Text(
-                          'Nenhum rascunho local. Medições finalizadas sem '
-                          'nome salvo no equipamento (por queda de conexão, '
-                          'por exemplo) aparecem aqui automaticamente.',
-                        ),
+                        padding: const EdgeInsets.all(24),
+                        child: Text(context.tr('localDrafts.empty')),
                       ),
                     ],
                   )
@@ -81,8 +78,10 @@ class _RascunhosLocaisPageState extends ConsumerState<RascunhosLocaisPage> {
                           leading: const Icon(Icons.drafts_outlined),
                           title: Text(rascunho.suggestedName),
                           subtitle: Text(
-                            '${rascunho.deviceLabel ?? "Equipamento desconhecido"} • '
-                            'criado ${formatRelativeAge(rascunho.createdAt)}',
+                            '${rascunho.deviceLabel ?? context.tr("localDrafts.unknownDevice")} • '
+                            '${context.tr("localDrafts.createdAgo", params: {
+                              "age": formatRelativeAge(rascunho.createdAt),
+                            })}',
                           ),
                           onTap: () async {
                             await Navigator.of(context).push(

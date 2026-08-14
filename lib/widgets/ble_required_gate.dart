@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/l10n/app_localizations.dart';
 import '../features/bluetooth/bluetooth_page.dart';
 import '../providers/app_controller.dart';
 
@@ -37,8 +38,7 @@ class BleRequiredGate extends ConsumerWidget {
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  message ??
-                      'Conecte um equipamento via Bluetooth para continuar.',
+                  message ?? context.tr('bleGate.message'),
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -48,7 +48,7 @@ class BleRequiredGate extends ConsumerWidget {
                     MaterialPageRoute(builder: (_) => const BluetoothPage()),
                   ),
                   icon: const Icon(Icons.bluetooth_searching),
-                  label: const Text('Conectar'),
+                  label: Text(context.tr('common.connect')),
                 ),
               ],
             ),

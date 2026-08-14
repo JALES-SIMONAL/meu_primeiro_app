@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/l10n/app_localizations.dart';
 import '../../providers/app_controller.dart';
 import '../bluetooth/bluetooth_page.dart';
 import '../equipment/analise/analise_dados_page.dart';
@@ -23,9 +24,9 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _index = 0;
 
   static const _tabs = [
-    _ShellTab(title: 'Experimentos', icon: Icons.science_outlined),
-    _ShellTab(title: 'Analise de Dados', icon: Icons.query_stats),
-    _ShellTab(title: 'Configuracoes', icon: Icons.settings_rounded),
+    _ShellTab(titleKey: 'shell.tabExperiments', icon: Icons.science_outlined),
+    _ShellTab(titleKey: 'shell.tabAnalysis', icon: Icons.query_stats),
+    _ShellTab(titleKey: 'shell.tabSettings', icon: Icons.settings_rounded),
   ];
 
   /// "Analise de Dados" só fica acessível de verdade quando habilitada em
@@ -40,11 +41,7 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     if (indice == _indiceAbaAnaliseDados && !analiseHabilitada) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Analise de dados esta desativada. Ative em Configuracoes.',
-          ),
-        ),
+        SnackBar(content: Text(context.tr('shell.analysisDisabledSnackbar'))),
       );
       return;
     }
@@ -54,9 +51,14 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(appControllerProvider);
-    final analiseHabilitada =
-        state.selectedDevice?.device.dataAnalysisEnabled ?? true;
+    // select() com tupla: só reconstrói esta tela (sempre montada, envolve
+    // as 3 abas) quando um desses dois campos muda — não a cada log, evento
+    // ao vivo ou tick de teste de canais em outra aba.
+    final (bleConnected, analiseHabilitada) = ref.watch(
+      appControllerProvider.select(
+        (s) => (s.bleConnected, s.selectedDevice?.device.dataAnalysisEnabled ?? true),
+      ),
+    );
 
     final pages = <Widget>[
       const ExperimentosPage(),
@@ -69,15 +71,15 @@ class _AppShellState extends ConsumerState<AppShell> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_tabs[_index].title),
+        title: Text(context.tr(_tabs[_index].titleKey)),
         actions: [
           IconButton(
-            tooltip: state.bleConnected
-                ? 'Bluetooth conectado'
-                : 'Conectar via Bluetooth',
+            tooltip: bleConnected
+                ? context.tr('shell.bluetoothConnected')
+                : context.tr('shell.bluetoothConnect'),
             icon: Icon(
-              state.bleConnected ? Icons.bluetooth_connected : Icons.bluetooth,
-              color: state.bleConnected ? Colors.lightGreenAccent : null,
+              bleConnected ? Icons.bluetooth_connected : Icons.bluetooth,
+              color: bleConnected ? Colors.lightGreenAccent : null,
             ),
             onPressed: () => Navigator.of(
               context,
@@ -106,7 +108,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                     for (final (indice, tab) in _tabs.indexed)
                       NavigationRailDestination(
                         icon: Icon(tab.icon, color: corIcone(indice)),
-                        label: Text(tab.title),
+                        label: Text(context.tr(tab.titleKey)),
                       ),
                   ],
                 ),
@@ -126,7 +128,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                   for (final (indice, tab) in _tabs.indexed)
                     NavigationDestination(
                       icon: Icon(tab.icon, color: corIcone(indice)),
-                      label: tab.title,
+                      label: context.tr(tab.titleKey),
                     ),
                 ],
               ),
@@ -139,8 +141,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 }
 
 class _ShellTab {
-  final String title;
+  final String titleKey;
   final IconData icon;
 
-  const _ShellTab({required this.title, required this.icon});
+  const _ShellTab({required this.titleKey, required this.icon});
 }

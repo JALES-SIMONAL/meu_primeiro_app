@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../core/utils/formatters.dart';
 import '../../../models/local_measurement_draft.dart';
 import '../../../providers/app_controller.dart';
@@ -63,18 +64,18 @@ class _RascunhoDetalhePageState extends ConsumerState<RascunhoDetalhePage> {
       final confirmar = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Nome ja existe'),
+          title: Text(context.tr('experimentExecution.nameExistsTitle')),
           content: Text(
-            'Ja existe um arquivo "$nome.csv" no equipamento. Sobrescrever?',
+            context.tr('experimentExecution.nameExistsContent', params: {'name': nome}),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Nao'),
+              child: Text(context.tr('common.no')),
             ),
             FilledButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Sobrescrever'),
+              child: Text(context.tr('experimentExecution.overwrite')),
             ),
           ],
         ),
@@ -87,19 +88,14 @@ class _RascunhoDetalhePageState extends ConsumerState<RascunhoDetalhePage> {
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Nao foi possivel enviar ao equipamento. Verifique a conexao '
-            'e se ha uma medicao aguardando nome nele.',
-          ),
-        ),
+        SnackBar(content: Text(context.tr('localDrafts.sendFailedSnackbar'))),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final bleConectado = ref.watch(appControllerProvider).bleConnected;
+    final bleConectado = ref.watch(appControllerProvider.select((s) => s.bleConnected));
 
     return Scaffold(
       appBar: AppBar(title: Text(widget.rascunho.suggestedName)),
@@ -107,10 +103,13 @@ class _RascunhoDetalhePageState extends ConsumerState<RascunhoDetalhePage> {
         children: [
           ListTile(
             title: Text(
-              widget.rascunho.deviceLabel ?? 'Equipamento desconhecido',
+              widget.rascunho.deviceLabel ?? context.tr('localDrafts.unknownDevice'),
             ),
             subtitle: Text(
-              'Criado ${formatRelativeAge(widget.rascunho.createdAt)}',
+              context.tr(
+                'localDrafts.createdAgoLabel',
+                params: {'age': formatRelativeAge(widget.rascunho.createdAt)},
+              ),
             ),
           ),
           Padding(
@@ -122,9 +121,9 @@ class _RascunhoDetalhePageState extends ConsumerState<RascunhoDetalhePage> {
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp('[A-Za-z0-9]')),
               ],
-              decoration: const InputDecoration(
-                labelText: 'Nome do arquivo',
-                helperText: 'Ate 20 caracteres, so letras e numeros',
+              decoration: InputDecoration(
+                labelText: context.tr('localDrafts.nameLabel'),
+                helperText: context.tr('localDrafts.nameHelper'),
               ),
             ),
           ),
@@ -136,11 +135,11 @@ class _RascunhoDetalhePageState extends ConsumerState<RascunhoDetalhePage> {
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.upload_outlined),
-            title: const Text('Enviar ao equipamento'),
+            title: Text(context.tr('localDrafts.sendToDevice')),
             subtitle: Text(
               bleConectado
-                  ? 'Salva com esse nome no cartao SD do equipamento'
-                  : 'Precisa estar conectado via Bluetooth',
+                  ? context.tr('localDrafts.sendToDeviceHintConnected')
+                  : context.tr('localDrafts.sendToDeviceHintDisconnected'),
             ),
             onTap: (_enviando || !bleConectado)
                 ? null
@@ -153,29 +152,24 @@ class _RascunhoDetalhePageState extends ConsumerState<RascunhoDetalhePage> {
           ),
           BorderedListTile(
             leading: const Icon(Icons.delete_outline),
-            title: const Text('Excluir rascunho'),
-            subtitle: const Text(
-              'Descarta a copia local. Se os dados nao foram salvos no '
-              'equipamento, eles se perdem.',
-            ),
+            title: Text(context.tr('localDrafts.deleteDraft')),
+            subtitle: Text(context.tr('localDrafts.deleteDraftSubtitle')),
             onTap: _excluido
                 ? null
                 : () async {
                     final confirmar = await showDialog<bool>(
                       context: context,
                       builder: (context) => AlertDialog(
-                        title: const Text('Excluir rascunho?'),
-                        content: const Text(
-                          'Essa acao nao pode ser desfeita.',
-                        ),
+                        title: Text(context.tr('localDrafts.deleteDraftConfirmTitle')),
+                        content: Text(context.tr('localDrafts.irreversible')),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(false),
-                            child: const Text('Nao'),
+                            child: Text(context.tr('common.no')),
                           ),
                           FilledButton(
                             onPressed: () => Navigator.of(context).pop(true),
-                            child: const Text('Sim'),
+                            child: Text(context.tr('common.yes')),
                           ),
                         ],
                       ),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/l10n/app_localizations.dart';
 import '../../../providers/app_controller.dart';
 import 'analise_circular_resultado_page.dart';
 
@@ -59,14 +60,14 @@ class _AnaliseCircularRaioVaosPageState
     );
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Raio e vaos')),
+      appBar: AppBar(title: Text(context.tr('circularRaioVaos.title'))),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _ValueStepper(
-              label: 'Raio',
+              label: context.tr('circularRaioVaos.radiusLabel'),
               suffix: 'mm',
               value: _raioMm,
               min: _raioMinMm,
@@ -75,22 +76,23 @@ class _AnaliseCircularRaioVaosPageState
             ),
             const SizedBox(height: 16),
             _ValueStepper(
-              label: 'Vaos',
+              label: context.tr('circularRaioVaos.gapsLabel'),
               value: _vaosQtd,
               min: _vaosMin,
               max: _vaosMax,
               onChanged: (v) => setState(() => _vaosQtd = v),
             ),
             const SizedBox(height: 24),
-            FilledButton(
+            FilledButton.icon(
               onPressed: carregando ? null : _calcular,
-              child: carregando
+              icon: carregando
                   ? const SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : const Text('Calcular'),
+                  : const Icon(Icons.calculate_outlined),
+              label: Text(context.tr('circularRaioVaos.calculate')),
             ),
           ],
         ),
